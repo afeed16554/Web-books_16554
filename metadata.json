@@ -1,0 +1,6 @@
+{
+  "name": "জৈব রসায়ন: হাইড্রোকার্বন (Interactive Concept Reader)",
+  "description": "Bangla-English Interactive Chemistry Concept Reader for Aliphatic Hydrocarbons, Alkanes, and Alkenes with KaTeX mhchem, adaptive SVGs, and OLED/Reading modes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

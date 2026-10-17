@@ -1,0 +1,362 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #f8fafc;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --accent: #2563eb;
+  --border: #e2e8f0;
+  --caution-bg: rgba(245, 158, 11, 0.12);
+  --caution-border: #f59e0b;
+  --font-scale: 1.05rem;
+  --warmth-opacity: 0;
+}
+
+/* Pitch-Black OLED Environment */
+[data-theme="oled"] {
+  --bg-primary: #000000;
+  --bg-card: rgba(14, 14, 18, 0.9);
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #38bdf8;
+  --border: #1e293b;
+  --caution-bg: rgba(245, 158, 11, 0.15);
+  --caution-border: #fbbf24;
+}
+
+/* Reading Mode (Paper Base) */
+[data-theme="reading"] {
+  --bg-primary: #f4ecd8;
+  --bg-card: rgba(251, 246, 233, 0.92);
+  --text-main: #2c221e;
+  --text-muted: #5c4b43;
+  --accent: #b45309;
+  --border: #dfceb4;
+  --caution-bg: rgba(180, 83, 9, 0.12);
+  --caution-border: #d97706;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif;
+  font-size: var(--font-scale);
+  line-height: 1.75;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* Warm Yellow Tone Filter Overlay */
+#warmth-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 190, 70, var(--warmth-opacity));
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 9998;
+  transition: background 0.15s ease;
+}
+
+/* Responsive Continuous Container (Phone -> Tablet -> Wide Monitor) */
+.reader-container {
+  max-width: min(1100px, 94vw);
+  margin: 0 auto;
+  padding: 2.5rem 1rem 6.5rem;
+}
+
+.topic-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  margin-bottom: 2rem;
+  backdrop-filter: blur(12px);
+}
+
+.topic-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.3rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin-bottom: 1.25rem;
+}
+
+[data-theme="oled"] .topic-badge {
+  color: #020617;
+}
+
+.topic-section h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.75rem;
+  color: var(--accent);
+  border-left: 4px solid var(--accent);
+  padding-left: 0.75rem;
+}
+
+.topic-section h2:first-of-type {
+  margin-top: 0.5rem;
+}
+
+.topic-section ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 0.65rem 0;
+}
+
+.topic-section li {
+  margin-bottom: 0.4rem;
+}
+
+/* Responsive Chemistry Tables */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table-wrapper tr:last-child td {
+  border-bottom: none;
+}
+
+.table-wrapper th {
+  background: rgba(128, 128, 128, 0.1);
+  font-weight: 700;
+}
+
+/* Interactive Dropdowns for Deep Connection & Zero Clutter */
+details.interactive-drop {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin: 0.85rem 0;
+  background: rgba(128, 128, 128, 0.04);
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+details.interactive-drop summary {
+  padding: 0.85rem 1.15rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+details.interactive-drop summary::-webkit-details-marker {
+  display: none;
+}
+
+details.interactive-drop summary::after {
+  content: "＋";
+  font-weight: bold;
+  color: var(--accent);
+  transition: transform 0.25s ease;
+}
+
+details[open].interactive-drop summary::after {
+  transform: rotate(45deg);
+}
+
+.drop-content {
+  padding: 0.75rem 1.15rem 1.15rem;
+  border-top: 1px solid var(--border);
+  animation: blurIn 0.2s ease-out;
+}
+
+@keyframes blurIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Warning / Caution Box */
+.caution-box {
+  background: var(--caution-bg);
+  border-left: 4px solid var(--caution-border);
+  padding: 0.9rem 1.15rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  font-weight: 500;
+}
+
+/* SVG Diagram Container */
+.svg-diagram {
+  width: 100%;
+  overflow-x: auto;
+  padding: 1rem;
+  text-align: center;
+  background: rgba(128, 128, 128, 0.03);
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  margin: 1rem 0;
+}
+
+/* On-Demand Floating Controls */
+.fab-dock {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  z-index: 9999;
+}
+
+.fab-btn {
+  background: rgba(30, 41, 59, 0.85);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(16px);
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.fab-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(51, 65, 85, 0.92);
+}
+
+.floating-panel {
+  position: fixed;
+  bottom: 4.75rem;
+  right: 1.25rem;
+  width: min(360px, 92vw);
+  max-height: 75vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  z-index: 9999;
+  animation: blurIn 0.2s ease-out;
+}
+
+.panel-row {
+  margin-bottom: 1rem;
+}
+
+.panel-row label {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
+  color: var(--text-muted);
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.theme-btn {
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.theme-btn.active-theme {
+  border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.topic-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.75rem;
+  color: var(--text-main);
+  text-decoration: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.topic-link:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+/* KaTeX overflow safety and Bangla glyph rendering inside \text{} */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35rem 0;
+}
+
+.katex .text,
+.katex .mtext,
+.svg-diagram svg text {
+  font-family: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif !important;
+}
+
+@media (max-width: 520px) {
+  .fab-dock {
+    bottom: 0.85rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  .fab-btn {
+    padding: 0.48rem 0.72rem;
+    font-size: 0.8rem;
+  }
+}
+
+
