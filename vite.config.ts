@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    ​base: '/Web-books_16554/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
