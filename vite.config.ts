@@ -5,7 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    ​base: '/Web-books_16554/',
+    base: process.env.GITHUB_ACTIONS ? '/Web-books_16554/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

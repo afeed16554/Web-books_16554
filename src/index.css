@@ -1,37 +1,46 @@
 @import "tailwindcss";
 
-:root {
-  --bg-primary: #f8fafc;
-  --bg-card: rgba(255, 255, 255, 0.85);
-  --text-main: #0f172a;
-  --text-muted: #475569;
-  --accent: #2563eb;
-  --border: #e2e8f0;
-  --caution-bg: rgba(245, 158, 11, 0.12);
-  --caution-border: #f59e0b;
-  --font-scale: 1.05rem;
+:root,
+[data-theme="oled"],
+[data-theme="dark"] {
+  --bg-primary: #000000;
+  --bg-card: #121215;
+  --surface-subtle: #1c1c21;
+  --text-main: #f5f5f7;
+  --text-muted: #9ca3af;
+  --accent: #38bdf8;
+  --accent-soft: rgba(56, 189, 248, 0.14);
+  --border: #27272d;
+  --caution-bg: rgba(245, 158, 11, 0.14);
+  --caution-border: #fbbf24;
+  --font-scale: 18px;
   --warmth-opacity: 0;
 }
 
-/* Pitch-Black OLED Environment */
-[data-theme="oled"] {
-  --bg-primary: #000000;
-  --bg-card: rgba(14, 14, 18, 0.9);
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --accent: #38bdf8;
-  --border: #1e293b;
-  --caution-bg: rgba(245, 158, 11, 0.15);
-  --caution-border: #fbbf24;
+/* Samsung One UI Clean Light Mode (#f2f2f7 canvas + #ffffff focus blocks) */
+[data-theme="light"] {
+  --bg-primary: #f2f2f7;
+  --bg-card: #ffffff;
+  --surface-subtle: #e5e5ea;
+  --text-main: #111827;
+  --text-muted: #4b5563;
+  --accent: #007aff;
+  --accent-soft: rgba(0, 122, 255, 0.11);
+  --border: #e2e4ea;
+  --caution-bg: rgba(245, 158, 11, 0.12);
+  --caution-border: #f59e0b;
 }
 
-/* Reading Mode (Paper Base) */
-[data-theme="reading"] {
+/* Reading Mode (Warm Paper Base) */
+[data-theme="reading"],
+[data-theme="yellow"] {
   --bg-primary: #f4ecd8;
-  --bg-card: rgba(251, 246, 233, 0.92);
+  --bg-card: #fbf6e9;
+  --surface-subtle: #efe4ca;
   --text-main: #2c221e;
   --text-muted: #5c4b43;
   --accent: #b45309;
+  --accent-soft: rgba(180, 83, 9, 0.14);
   --border: #dfceb4;
   --caution-bg: rgba(180, 83, 9, 0.12);
   --caution-border: #d97706;
@@ -51,38 +60,140 @@ body {
   font-family: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif;
   font-size: var(--font-scale);
   line-height: 1.75;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition: background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   overflow-x: hidden;
   margin: 0;
   padding: 0;
 }
 
-/* Warm Yellow Tone Filter Overlay */
-#warmth-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(255, 190, 70, var(--warmth-opacity));
-  mix-blend-mode: multiply;
-  pointer-events: none;
-  z-index: 9998;
-  transition: background 0.15s ease;
+/* =====================================================================
+   SAMSUNG ONE UI LAYOUT & GRID SYSTEM (basic.html & grid.html)
+   - Viewing Area: Top screen space with wide margins & center-aligned title,
+     recognized at a glance without interactive clutter.
+   - Interaction Area: Below the viewing area, minimum 24dp (24px) keyline
+     margins on left & right sides to avoid curved-edge conflicts & grip zones.
+   - Focus Blocks: 26px squircle radius for Card Grid & Grouped List containers.
+   ===================================================================== */
+.oneui-viewing-area {
+  width: 100%;
+  padding: clamp(2rem, 5.5vh, 3.75rem) max(24px, 4vw) clamp(1.5rem, 3.5vh, 2.5rem);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
 }
 
-/* Responsive Continuous Container (Phone -> Tablet -> Wide Monitor) */
+.oneui-interaction-area {
+  width: 100%;
+  padding-left: max(24px, 2.75vw);
+  padding-right: max(24px, 2.75vw);
+  padding-bottom: 4rem;
+}
+
+/* Focus Block Container (Grouped List or Singular Block) — 26px One UI Radius */
+.oneui-focus-block {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  overflow: hidden;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+/* Focus Block Card (Card Grid / 2-Column / 3-Column Grid) — 26px One UI Radius */
+.oneui-focus-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  padding: 1.35rem 1.4rem;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.24s ease,
+    background-color 0.24s ease;
+}
+
+.oneui-focus-card:hover {
+  border-color: var(--accent);
+  background-color: var(--surface-subtle);
+  transform: translateY(-2px);
+}
+
+.oneui-focus-card:active {
+  transform: scale(0.985);
+}
+
+/* Grouped List Item inside a One UI Focus Block */
+.oneui-list-row {
+  width: 100%;
+  min-height: 68px;
+  padding: 0.95rem 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid var(--border);
+}
+
+.oneui-list-row:last-child {
+  border-bottom: none;
+}
+
+.oneui-list-row:hover {
+  background-color: var(--surface-subtle);
+}
+
+.oneui-list-row:active {
+  background-color: var(--accent-soft);
+}
+
+/* Smooth layout & view transitions */
+.smooth-sidebar {
+  transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease;
+  will-change: width, transform, opacity;
+}
+
+.smooth-workspace {
+  transition: padding 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.view-transition-enter {
+  animation: viewSmoothFade 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes viewSmoothFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Full-width Responsive Continuous Reader Container (Respects 24dp keyline margin) */
 .reader-container {
-  max-width: min(1100px, 94vw);
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 2.5rem 1rem 6.5rem;
+  padding: 1rem 0 5rem;
 }
 
 .topic-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: clamp(1.25rem, 3vw, 2.25rem);
-  margin-bottom: 2rem;
-  backdrop-filter: blur(12px);
-  scroll-margin-top: 1.5rem;
+  border-radius: 26px;
+  padding: clamp(1.35rem, 2.5vw, 2.25rem);
+  margin-bottom: 1.5rem;
+  scroll-margin-top: 4.5rem;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
 }
 
 .topic-badge {
@@ -107,8 +218,8 @@ body {
   font-weight: 700;
   margin: 1.25rem 0 0.75rem;
   color: var(--accent);
-  border-left: 4px solid var(--accent);
-  padding-left: 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .topic-section h2:first-of-type {
@@ -129,7 +240,7 @@ body {
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
-  border-radius: 12px;
+  border-radius: 18px;
   border: 1px solid var(--border);
   margin: 1rem 0;
 }
@@ -157,14 +268,14 @@ body {
   font-weight: 700;
 }
 
-/* Interactive Dropdowns for Deep Connection & Zero Clutter */
+/* Interactive Dropdowns for Deep Connection & Zero Clutter (System labels in English only) */
 details.interactive-drop {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 18px;
   margin: 0.85rem 0;
   background: rgba(128, 128, 128, 0.04);
   overflow: hidden;
-  transition: all 0.25s ease;
+  transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 details.interactive-drop summary {
@@ -176,6 +287,11 @@ details.interactive-drop summary {
   justify-content: space-between;
   align-items: center;
   user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+details.interactive-drop summary:hover {
+  background: rgba(128, 128, 128, 0.06);
 }
 
 details.interactive-drop summary::-webkit-details-marker {
@@ -183,24 +299,33 @@ details.interactive-drop summary::-webkit-details-marker {
 }
 
 details.interactive-drop summary::after {
-  content: "+";
-  font-size: 1.3rem;
-  line-height: 1;
-  font-weight: 700;
+  content: "See";
+  font-size: 0.78rem;
+  line-height: 1.2;
+  font-weight: 600;
   color: var(--accent);
-  transition: transform 0.25s ease;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  padding: 0.28rem 0.72rem;
+  border-radius: 10px;
+  transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
   margin-left: 0.75rem;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 details[open].interactive-drop summary::after {
-  transform: rotate(45deg);
+  content: "Hide";
+  transform: none;
+  background: rgba(128, 128, 128, 0.14);
+  border-color: var(--border);
+  color: var(--text-muted);
 }
 
 .drop-content {
   padding: 0.75rem 1.15rem 1.15rem;
   border-top: 1px solid var(--border);
-  animation: blurIn 0.2s ease-out;
+  animation: blurIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes blurIn {
@@ -217,9 +342,9 @@ details[open].interactive-drop summary::after {
 /* Warning / Caution Box */
 .caution-box {
   background: var(--caution-bg);
-  border-left: 4px solid var(--caution-border);
-  padding: 0.9rem 1.15rem;
-  border-radius: 8px;
+  border: 1px solid var(--caution-border);
+  padding: 0.95rem 1.2rem;
+  border-radius: 16px;
   margin: 1rem 0;
   font-weight: 500;
 }
@@ -231,7 +356,7 @@ details[open].interactive-drop summary::after {
   padding: 1rem;
   text-align: center;
   background: rgba(128, 128, 128, 0.03);
-  border-radius: 12px;
+  border-radius: 18px;
   border: 1px dashed var(--border);
   margin: 1rem 0;
 }
@@ -241,109 +366,6 @@ details[open].interactive-drop summary::after {
   height: auto;
   display: block;
   margin: 0 auto;
-}
-
-/* On-Demand Floating Controls */
-.fab-dock {
-  position: fixed;
-  bottom: 1.25rem;
-  right: 1.25rem;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  z-index: 9999;
-}
-
-.fab-btn {
-  background: rgba(30, 41, 59, 0.85);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(16px);
-  padding: 0.6rem 1rem;
-  border-radius: 999px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.92rem;
-  font-weight: 600;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  transition: transform 0.15s ease, background-color 0.15s ease;
-  white-space: nowrap;
-}
-
-.fab-btn:hover {
-  transform: translateY(-2px);
-  background: rgba(51, 65, 85, 0.92);
-}
-
-.floating-panel {
-  position: fixed;
-  bottom: 4.75rem;
-  right: 1.25rem;
-  width: min(360px, 92vw);
-  max-height: 75vh;
-  overflow-y: auto;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: 1.25rem;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-  z-index: 9999;
-  animation: blurIn 0.2s ease-out;
-}
-
-.panel-row {
-  margin-bottom: 1rem;
-}
-
-.panel-row label {
-  display: block;
-  font-size: 0.9rem;
-  margin-bottom: 0.35rem;
-  color: var(--text-muted);
-}
-
-.theme-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-}
-
-.theme-btn {
-  padding: 0.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-main);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.88rem;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.theme-btn.active-theme {
-  border-color: var(--accent);
-  background: rgba(56, 189, 248, 0.12);
-}
-
-.topic-link {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  font-size: 0.95rem;
-  padding: 0.55rem 0.75rem;
-  color: var(--text-main);
-  text-decoration: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.topic-link:hover {
-  background: rgba(128, 128, 128, 0.12);
 }
 
 /* KaTeX overflow safety and Bangla glyph rendering inside \text{} */
@@ -358,21 +380,3 @@ details[open].interactive-drop summary::after {
 .svg-diagram svg text {
   font-family: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif !important;
 }
-
-@media (max-width: 520px) {
-  .fab-dock {
-    bottom: 0.85rem;
-    right: 0.75rem;
-    left: 0.75rem;
-    flex-wrap: nowrap;
-    justify-content: flex-end;
-    gap: 0.35rem;
-  }
-
-  .fab-btn {
-    padding: 0.48rem 0.72rem;
-    font-size: 0.8rem;
-  }
-}
-
-

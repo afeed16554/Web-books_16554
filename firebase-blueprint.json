@@ -1,0 +1,212 @@
+{
+  "entities": {
+    "UserPrivateProfile": {
+      "title": "UserPrivateProfile",
+      "description": "Isolated private student/user profile storing Google account details, phone number, optional student class, and optional school/college name.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name from Google account.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified email address from Google account.",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User mobile/contact number (optional, can be empty string).",
+          "minLength": 0,
+          "maxLength": 30
+        },
+        "studentClass": {
+          "type": "string",
+          "description": "Optional student class (e.g., Class 11-12 (HSC), Class 9-10 (SSC), Class 8).",
+          "minLength": 0,
+          "maxLength": 60
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Optional student school or college name.",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last profile update."
+        }
+      },
+      "required": ["uid", "displayName", "email", "phoneNumber", "studentClass", "schoolName", "updatedAt"]
+    },
+    "FeedbackItem": {
+      "title": "FeedbackItem",
+      "description": "User feedback entry for a specific topic or chapter.",
+      "type": "object",
+      "properties": {
+        "authorUid": {
+          "type": "string",
+          "description": "UID of the user submitting the feedback.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Name of the feedback author.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "Contact phone number attached to the feedback.",
+          "minLength": 0,
+          "maxLength": 30
+        },
+        "topicId": {
+          "type": "string",
+          "description": "ID of the topic page being reviewed.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "rating": {
+          "type": "integer",
+          "description": "Star rating from 1 to 5."
+        },
+        "message": {
+          "type": "string",
+          "description": "Feedback comment or suggestion.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the feedback was created."
+        }
+      },
+      "required": ["authorUid", "authorName", "phoneNumber", "topicId", "rating", "message", "createdAt"]
+    },
+    "CustomTopicPage": {
+      "title": "CustomTopicPage",
+      "description": "Admin-uploaded or custom-built textbook topic page organized by Class, Subject, Paper, and Chapter.",
+      "type": "object",
+      "properties": {
+        "authorUid": {
+          "type": "string",
+          "description": "UID of the admin creator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "className": {
+          "type": "string",
+          "description": "Class level (e.g., Class 11-12 (HSC)).",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject name (e.g., Chemistry).",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "paper": {
+          "type": "string",
+          "description": "Paper name (e.g., 2nd Paper).",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "chapter": {
+          "type": "string",
+          "description": "Chapter name (e.g., 2nd Chapter: Organic Chemistry).",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "title": {
+          "type": "string",
+          "description": "Topic title.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "sectionsHtml": {
+          "type": "string",
+          "description": "Raw HTML <section class='topic-section'> content for the reader.",
+          "minLength": 1,
+          "maxLength": 200000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when created."
+        }
+      },
+      "required": ["authorUid", "className", "subject", "paper", "chapter", "title", "sectionsHtml", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Selective admin record granting admin editor access to a specific user UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "UID of the selective admin user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified email address of the selective admin.",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "addedByUid": {
+          "type": "string",
+          "description": "UID of the super admin who granted access.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when admin access was granted."
+        }
+      },
+      "required": ["uid", "email", "addedByUid", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users_private/{userId}": {
+      "schema": { "$ref": "#/entities/UserPrivateProfile" },
+      "description": "Stores isolated private student profile (phone, optional class, optional school)."
+    },
+    "/feedbacks/{feedbackId}": {
+      "schema": { "$ref": "#/entities/FeedbackItem" },
+      "description": "Stores user feedback entries."
+    },
+    "/custom_topics/{topicPageId}": {
+      "schema": { "$ref": "#/entities/CustomTopicPage" },
+      "description": "Stores admin-uploaded custom topic pages."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Stores selective admin records keyed by user UID."
+    }
+  }
+}

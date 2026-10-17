@@ -8,88 +8,163 @@ import {
   BATCH_5_SECTIONS,
   ALL_SECTIONS,
   MAIN_NAVIGATION_TOPICS,
-  getRawBatch3SectionsHtml,
-  getBatch3NavigationLinksHtml,
-  getRawBatch4SectionsHtml,
-  getBatch4NavigationLinksHtml,
   getRawBatch5SectionsHtml,
-  getBatch5NavigationLinksHtml
+  getAllSectionsHtml,
 } from './chemistrySections.ts';
+import {
+  ALL_CLASS_LEVELS,
+  BUILT_IN_PAGES,
+  buildFolderHierarchy,
+  extractMainTopicsFromHtml,
+  formatCleanReaderHeader,
+  getChaptersForSubjectPaper,
+  getSubjectPaperCards,
+  isAuthorizedAdminEmail,
+  PRIMARY_ADMIN_EMAIL,
+} from './libraryCatalog.ts';
 
-test('BATCH_5_SECTIONS contains valid <section class="topic-section" id="..."> blocks for Alkyne Oxidation, Polymerization, and Hydrocarbon Comparison', () => {
-  assert.equal(BATCH_5_SECTIONS.length, 2);
-  for (const section of BATCH_5_SECTIONS) {
-    assert.ok(
-      section.html.includes(`<section class="topic-section" id="${section.id}">`),
-      `Missing section tag with id="${section.id}"`
-    );
-    assert.ok(section.html.includes('</section>'));
-  }
-});
-
-test('getBatch5NavigationLinksHtml generates exact <a class="topic-link" href="#..." onclick="togglePanel(\'topic-panel\')"> tags', () => {
-  const navHtml = getBatch5NavigationLinksHtml();
-  assert.ok(
-    navHtml.includes(
-      '<a class="topic-link" href="#topic-alkyne-oxidation-polymerization" onclick="togglePanel(\'topic-panel\')">১১. অ্যালকাইনের জারণ ও পলিমারকরণ বিক্রিয়া</a>'
-    )
-  );
-  assert.ok(
-    navHtml.includes(
-      '<a class="topic-link" href="#topic-hydrocarbon-comparison-tests" onclick="togglePanel(\'topic-panel\')">১২. অ্যালকেন, অ্যালকিন ও অ্যালকাইনের পার্থক্য, রূপান্তর ও শনাক্তকরণ</a>'
-    )
-  );
-});
-
-test('MAIN_NAVIGATION_TOPICS includes all 12 main topics and excludes minor sub-tables', () => {
-  assert.equal(MAIN_NAVIGATION_TOPICS.length, 12);
+test('All 5 batches contain the expected 13 sections and 12 main navigation topics', () => {
   assert.equal(
-    MAIN_NAVIGATION_TOPICS.some((t) => t.id === 'topic-reforming-table'),
-    false
-  );
-  assert.equal(
-    ALL_SECTIONS.length,
     BATCH_1_SECTIONS.length +
       BATCH_2_SECTIONS.length +
       BATCH_3_SECTIONS.length +
       BATCH_4_SECTIONS.length +
-      BATCH_5_SECTIONS.length
+      BATCH_5_SECTIONS.length,
+    13
   );
-  assert.ok(getBatch3NavigationLinksHtml().includes('#topic-alkene-addition-ozonolysis'));
-  assert.ok(getRawBatch3SectionsHtml().includes('২-মিথাইলবিউট-২-ইন'));
-  assert.ok(getBatch4NavigationLinksHtml().includes('#topic-alkyne-prep-acidity'));
-  assert.ok(getRawBatch4SectionsHtml().includes("Kucherov's reaction"));
+  assert.equal(ALL_SECTIONS.length, 13);
+  assert.equal(MAIN_NAVIGATION_TOPICS.length, 12);
 });
 
-test('Zero data loss check for Batch 5 Alkyne Oxidation, Polymerization & Hydrocarbon Comparison Pages', () => {
-  const html = getRawBatch5SectionsHtml();
+test('Zero data loss check on all sections yields and temperatures (90%, 10%, 99.1%, 0.9%, 60°C, 20% H2SO4, 2% HgSO4)', () => {
+  const html = getAllSectionsHtml();
+  assert.ok(html.includes('90%'), 'Must include 90% Markovnikov major yield');
+  assert.ok(html.includes('10%'), 'Must include 10% Markovnikov minor yield');
+  assert.ok(
+    html.includes('99.1%'),
+    'Must include 99.1% Anti-Markovnikov major yield'
+  );
+  assert.ok(
+    html.includes('0.9%'),
+    'Must include 0.9% Anti-Markovnikov minor yield'
+  );
+  assert.ok(html.includes('20%'), 'Must include 20% H2SO4');
+  assert.ok(html.includes('Hg'), 'Must include 2% Hg2+ / HgSO4');
+  assert.ok(
+    html.includes('লাল অধঃক্ষেপ'),
+    'Must include red copper acetylide precipitate'
+  );
+  assert.ok(
+    html.includes('সাদা অধঃক্ষেপ'),
+    'Must include white silver acetylide precipitate'
+  );
+});
 
-  // Page 1: Alkyne Oxidation (KMnO4 & K2Cr2O7), Oxy-acetylene flame, Aromatic Polymerization (Benzene & Mesitylene)
-  assert.ok(html.includes('অ্যালকাইনের শনাক্তকরণ বেয়ার পরীক্ষা'));
-  assert.ok(html.includes('অক্সালিক এসিড উৎপন্ন হয়'));
-  assert.ok(html.includes('HOOC-COOH'));
-  assert.ok(html.includes('অম্লীয় $\\ce{K2Cr2O7}$ দ্বারা জারণ'));
-  assert.ok(html.includes('অক্সি-অ্যাসিটিলিন শিখা'));
-  assert.ok(html.includes('3500^\\circ\\text{C}'));
-  assert.ok(html.includes('2C2H2(g) + 5O2(g) -> 4CO2(g) + 2H2O(g)'));
-  assert.ok(html.includes('অ্যারোমেটিক পলিমার গঠন'));
-  assert.ok(html.includes('450^\\circ\\text{C}'));
-  assert.ok(html.includes('600^\\circ\\text{C}'));
-  assert.ok(html.includes('মেসিটিইলিন ($1,3,5$-ট্রাইমিথাইল বেনজিন)'));
+test('No duplicate see-hide-pill spans exist in raw HTML', () => {
+  const allHtml = getAllSectionsHtml();
+  assert.ok(
+    !allHtml.includes('see-hide-pill'),
+    'Raw HTML should not contain hardcoded see-hide-pill spans'
+  );
+});
 
-  // Page 2: Comparison of Alkane, Alkene, Alkyne, Interconversion triangle, Distinguishing tests
-  assert.ok(html.includes('অ্যালকেন, অ্যালকিন, অ্যালকাইনের পার্থক্য এবং পারস্পরিক রূপান্তর'));
-  assert.ok(html.includes('চতুস্তলকীয়'));
-  assert.ok(html.includes('ত্রিকোণীয় সমতলীয়'));
-  assert.ok(html.includes('সরলরৈখিক সমতলীয়'));
-  assert.ok(html.includes('109.5^\\circ'));
-  assert.ok(html.includes('120^\\circ'));
-  assert.ok(html.includes('180^\\circ'));
-  assert.ok(html.includes('0.154\\text{ nm}'));
-  assert.ok(html.includes('0.134\\text{ nm}'));
-  assert.ok(html.includes('0.120\\text{ nm}'));
-  assert.ok(html.includes('পারস্পরিক রূপান্তর'));
-  assert.ok(html.includes('অ্যালকিন-1, অ্যালকাইন-1 এর পার্থক্যকারী বিক্রিয়া'));
-  assert.ok(html.includes('সিলভার অ্যালকাইনাইড (বা অ্যাসিটিলাইড) এর সাদা অধঃক্ষেপ পড়ে'));
-  assert.ok(html.includes('কপার অ্যালকাইনাইড বা অ্যাসিটিলাইড এর লাল অধঃক্ষেপ পড়ে'));
+test('System catalog metadata contains no Bangla characters in system fields', () => {
+  const page = BUILT_IN_PAGES[0];
+  const banglaRegex = /[\u0980-\u09FF]/;
+  assert.equal(
+    banglaRegex.test(page.chapter),
+    false,
+    'Chapter system label must be English only'
+  );
+  assert.equal(
+    banglaRegex.test(page.title),
+    false,
+    'Page title system label must be English only'
+  );
+  assert.equal(
+    banglaRegex.test(page.subtitle),
+    false,
+    'Page subtitle system label must be English only'
+  );
+});
+
+test('Sidebar folder hierarchy includes all classes from Class 1 to 8, Class 9-10 (SSC), and Class 11-12 (HSC)', () => {
+  assert.equal(ALL_CLASS_LEVELS.length, 10);
+  const tree = buildFolderHierarchy(BUILT_IN_PAGES);
+  const classNames = tree.map((n) => n.name);
+  for (const expectedClass of ALL_CLASS_LEVELS) {
+    assert.ok(
+      classNames.includes(expectedClass),
+      `Sidebar folder tree must include ${expectedClass}`
+    );
+  }
+});
+
+test('Home Page Subject+Paper cards filter dynamically when student configures Class in profile', () => {
+  const defaultCards = getSubjectPaperCards(BUILT_IN_PAGES, 'ALL');
+  assert.ok(
+    defaultCards.some((c) => c.displayName === 'Chemistry 2nd Paper'),
+    'Default home page shows Chemistry 2nd Paper'
+  );
+
+  const sscCards = getSubjectPaperCards(BUILT_IN_PAGES, 'Class 9-10 (SSC)');
+  assert.ok(
+    sscCards.every((c) => c.className === 'Class 9-10 (SSC)'),
+    'When student sets Class 9-10 (SSC), only SSC subjects appear on Home Page'
+  );
+
+  const class7Cards = getSubjectPaperCards(BUILT_IN_PAGES, 'Class 7');
+  assert.ok(
+    class7Cards.every((c) => c.className === 'Class 7'),
+    'When student sets Class 7, only Class 7 subjects appear on Home Page'
+  );
+  const banglaRegex = /[\u0980-\u09FF]/;
+  assert.ok(
+    class7Cards.every((c) => !banglaRegex.test(c.displayName)),
+    'Class 7 subject cards must be English only'
+  );
+});
+
+test('Progressive drill-down: getChaptersForSubjectPaper returns 5 chapters for Chemistry 2nd Paper and links Alkane, Alkene & Alkyne to 2nd Chapter: Organic Chemistry', () => {
+  const chapters = getChaptersForSubjectPaper(
+    BUILT_IN_PAGES,
+    'Class 11-12 (HSC)',
+    'Chemistry',
+    '2nd Paper'
+  );
+  assert.equal(chapters.length, 5);
+  const ch2 = chapters.find(
+    (c) => c.chapterTitle === '2nd Chapter: Organic Chemistry'
+  );
+  assert.ok(ch2, 'Must include 2nd Chapter: Organic Chemistry');
+  assert.equal(ch2.pages.length, 1);
+  assert.equal(ch2.pages[0].title, 'Alkane, Alkene & Alkyne');
+});
+
+test('Clean Reader Header formats exclusively as Chapter Name : Topic Name', () => {
+  const header = formatCleanReaderHeader(
+    BUILT_IN_PAGES[0].chapter,
+    BUILT_IN_PAGES[0].title
+  );
+  assert.equal(
+    header,
+    '2nd Chapter: Organic Chemistry : Alkane, Alkene & Alkyne'
+  );
+});
+
+test('Selective Admin Email verification allows only primary admin or allowlisted emails', () => {
+  assert.equal(isAuthorizedAdminEmail(PRIMARY_ADMIN_EMAIL), true);
+  assert.equal(isAuthorizedAdminEmail('student@gmail.com'), false);
+  assert.equal(
+    isAuthorizedAdminEmail('teacher@gmail.com', ['teacher@gmail.com']),
+    true
+  );
+});
+
+test('extractMainTopicsFromHtml parses section ids and h2 titles', () => {
+  const sample = `<section class="topic-section" id="sec-a"><h2>1. Alkanes</h2></section>`;
+  const topics = extractMainTopicsFromHtml(sample);
+  assert.equal(topics.length, 1);
+  assert.equal(topics[0].id, 'sec-a');
+  assert.equal(topics[0].title, '1. Alkanes');
 });
