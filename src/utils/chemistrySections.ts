@@ -1,22 +1,22 @@
 export interface TopicItem {
   id: string;
   title: string;
-  category: 'batch-1-alkane' | 'batch-2-alkene';
-  pageSource: string;
+  isMainTopic?: boolean;
+  batch: 'batch-1' | 'batch-2' | 'batch-3';
   html: string;
 }
 
 /**
- * Batch 1 (Pages 1-4 from first upload): Aliphatic Hydrocarbons & Alkanes
+ * Batch 1: Aliphatic Hydrocarbons & Alkanes (Pages 1-4)
  */
-export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
+export const BATCH_1_SECTIONS: TopicItem[] = [
   {
     id: 'topic-aliphatic-sources',
-    title: '১. অ্যালিফেটিক হাইড্রোকার্বনের উৎস ও নকিং (Knocking)',
-    category: 'batch-1-alkane',
-    pageSource: 'পর্ব ১: পৃষ্ঠা ১ ও ২',
+    title: '১. অ্যালিফেটিক হাইড্রোকার্বনের উৎস ও নকিং',
+    isMainTopic: true,
+    batch: 'batch-1',
     html: `  <!-- SECTION A1: ALIPHATIC HYDROCARBON SOURCES & KNOCKING -->
-  <section id="topic-aliphatic-sources" class="topic-section">
+  <section class="topic-section" id="topic-aliphatic-sources">
     <div class="topic-badge">অ্যালিফেটিক হাইড্রোকার্বন (Concept)</div>
     <h2>অ্যালিফেটিক হাইড্রোকার্বনের উৎস</h2>
     <p><strong>(i) প্রাকৃতিক গ্যাস:</strong> প্রাকৃতিক গ্যাসে প্রাপ্ত অ্যালকেনের কার্বন সংখ্যা $1 - 4$।</p>
@@ -75,11 +75,11 @@ export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
   },
   {
     id: 'topic-alkane-prep',
-    title: '২. অ্যালকেনের সাধারণ প্রস্তুত প্রণালী ও শনাক্তকরণ',
-    category: 'batch-1-alkane',
-    pageSource: 'পর্ব ১: পৃষ্ঠা ২ ও ৩',
+    title: '২. অ্যালকেনের প্রস্তুত প্রণালী ও শনাক্তকরণ',
+    isMainTopic: true,
+    batch: 'batch-1',
     html: `  <!-- SECTION A2: ALKANE PREPARATION, WURTZ & SCHIEVER'S TEST -->
-  <section id="topic-alkane-prep" class="topic-section">
+  <section class="topic-section" id="topic-alkane-prep">
     <div class="topic-badge">অ্যালকেন (Alkane)</div>
     <p><strong>সাধারণ সংকেত:</strong> অ্যালকেনের সাধারণ সংকেত $\\ce{C_nH_{2n+2}}$।</p>
 
@@ -172,10 +172,10 @@ export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
   {
     id: 'topic-alkane-halogenation',
     title: '৩. অ্যালকেনের ভৌত ধর্ম ও হ্যালোজেনেশন বিক্রিয়া',
-    category: 'batch-1-alkane',
-    pageSource: 'পর্ব ১: পৃষ্ঠা ৩ ও ৪',
+    isMainTopic: true,
+    batch: 'batch-1',
     html: `  <!-- SECTION A3: PHYSICAL PROPERTIES & HALOGENATION OF ALKANES -->
-  <section id="topic-alkane-halogenation" class="topic-section">
+  <section class="topic-section" id="topic-alkane-halogenation">
     <h2>অ্যালকেনসমূহের ভৌত ধর্ম ও হ্যালোজেনেশন বিক্রিয়া</h2>
 
     <details class="interactive-drop" open>
@@ -248,10 +248,10 @@ export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
   {
     id: 'topic-alkane-reforming',
     title: '৪. অ্যালকেনের অন্যান্য বিক্রিয়া ও রিফরমিং (Reforming)',
-    category: 'batch-1-alkane',
-    pageSource: 'পর্ব ১: পৃষ্ঠা ৪',
+    isMainTopic: true,
+    batch: 'batch-1',
     html: `  <!-- SECTION A4: FURTHER ALKANE REACTIONS & REFORMING / AROMATIZATION -->
-  <section id="topic-alkane-reforming" class="topic-section">
+  <section class="topic-section" id="topic-alkane-reforming">
     <h2>অ্যালকেনের আরও কিছু বিক্রিয়া ও রিফরমিং প্রক্রিয়া</h2>
     <div class="table-wrapper">
       <table>
@@ -307,10 +307,8 @@ export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
         <p style="margin-top: 0.5rem;"><strong>সংজ্ঞা:</strong> প্রভাবকের উপস্থিতিতে মুক্ত শিকল হাইড্রোকার্বন থেকে অ্যারোমেটিক হাইড্রোকার্বন প্রস্তুতির প্রক্রিয়াকে অ্যারোমেটিকরণ বা রিফরমিং প্রক্রিয়া (reforming) বলা হয়।</p>
         <p>n-হেক্সেন থেকে বেনজিন, n-হেপ্টেন থেকে টলুইন এবং n- অক্টেন থেকে জাইলিন পাওয়া যায়।</p>
 
-        <!-- Custom Adaptive SVG for Reforming / Aromatization Reactions (n-Hexane, n-Heptane, n-Octane) -->
         <div class="svg-diagram">
           <svg viewBox="0 0 860 390" width="100%" height="390" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <!-- ================= ROW 1: n-Hexane to Benzene ================= -->
             <polyline points="25,65 43,47 61,65 79,47 97,65 115,47" />
             <text x="45" y="92" fill="currentColor" stroke="none" font-size="14">n-হেক্সেন</text>
 
@@ -336,7 +334,6 @@ export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
             <circle cx="645" cy="56" r="13" />
             <text x="685" y="61" fill="currentColor" stroke="none" font-size="15">+  3H<tspan dy="3" font-size="11">2</tspan></text>
 
-            <!-- ================= ROW 2: n-Heptane to Toluene ================= -->
             <polyline points="95,180 113,162 131,180 149,162 167,180 185,162 203,180" />
             <text x="125" y="205" fill="currentColor" stroke="none" font-size="14">n-হেপ্টেন</text>
 
@@ -362,7 +359,6 @@ export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
             <text x="520" y="218" fill="currentColor" stroke="none" font-size="14">টলুইন</text>
             <text x="575" y="178" fill="currentColor" stroke="none" font-size="15">+  3H<tspan dy="3" font-size="11">2</tspan></text>
 
-            <!-- ================= ROW 3: n-Octane to o-Xylene & p-Xylene ================= -->
             <polyline points="15,315 31,297 47,315 63,297 79,315 95,297 111,315 127,297" />
             <text x="45" y="362" fill="currentColor" stroke="none" font-size="14">n-অক্টেন</text>
 
@@ -420,19 +416,16 @@ export const BATCH_1_ALKANE_SECTIONS: TopicItem[] = [
 ];
 
 /**
- * Batch 2 (Pages 1-3 from current upload):
- * - Page 1: Reforming / Aromatization Summary Table (n-Hexane, n-Heptane, n-Octane)
- * - Page 2 & Page 3 (top): Alkene Intro & General Preparation Methods (i)-(v) + Caution + Zaitsev/Saytzeff & Lindlar notes
- * - Page 3 (bottom): Electrophilic Addition of Alkene (General Mechanism + Ethene + HCl), Markovnikov's Rule (90%/10% diagram), Anti-Markovnikov / Kharasch Peroxide Effect (99.1%/0.9% cyclic radical diagram), and HBr Caution.
+ * Batch 2: Reforming Summary Table, Alkene Preparation, Electrophilic Addition & Markovnikov (Pages 5-7)
  */
-export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
+export const BATCH_2_SECTIONS: TopicItem[] = [
   {
     id: 'topic-reforming-table',
-    title: '৫. রিফরমিং (অ্যারোমেটিকরণ) বিক্রিয়ার সারণি',
-    category: 'batch-2-alkene',
-    pageSource: 'পর্ব ২: পৃষ্ঠা ১ (Page 1)',
-    html: `  <!-- SECTION B1: REFORMING / AROMATIZATION SUMMARY TABLE (From Page 1) -->
-  <section id="topic-reforming-table" class="topic-section">
+    title: 'রিফরমিং (অ্যারোমেটিকরণ) বিক্রিয়ার সারণি',
+    isMainTopic: false,
+    batch: 'batch-2',
+    html: `  <!-- SECTION B1: REFORMING / AROMATIZATION SUMMARY TABLE -->
+  <section class="topic-section" id="topic-reforming-table">
     <h2>রিফরমিং (অ্যারোমেটিকরণ) বিক্রিয়ার প্রভাবক ও উৎপাদ</h2>
     <div class="table-wrapper">
       <table>
@@ -466,11 +459,11 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
   },
   {
     id: 'topic-alkene-prep',
-    title: '৬. অ্যালকিন ও অ্যালকিনের সাধারণ প্রস্তুত প্রণালী',
-    category: 'batch-2-alkene',
-    pageSource: 'পর্ব ২: পৃষ্ঠা ২ ও ৩ (Page 2 & 3)',
-    html: `  <!-- SECTION B2: ALKENE INTRO & PREPARATION (From Page 2 & 3) -->
-  <section id="topic-alkene-prep" class="topic-section">
+    title: '৫. অ্যালকিনের প্রস্তুত প্রণালী',
+    isMainTopic: true,
+    batch: 'batch-2',
+    html: `  <!-- SECTION B2: ALKENE INTRO & PREPARATION -->
+  <section class="topic-section" id="topic-alkene-prep">
     <div class="topic-badge">অ্যালকিন</div>
     <p><strong>সাধারণ সংকেত:</strong> অ্যালকিনের সাধারণ সংকেত $\\ce{C_nH_{2n}}$। এরা অসম্পৃক্ত যৌগ এবং দ্বি-বন্ধনযুক্ত দুটি কার্বনের মাঝে একটি $\\pi$ বন্ধন থাকে।</p>
 
@@ -547,18 +540,15 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
   },
   {
     id: 'topic-markovnikov',
-    title: '৭. অ্যালকিনের ইলেকট্রোফিলিক সংযোজন, মার্কনিকভ ও এন্টিমার্কনিকভ নীতি',
-    category: 'batch-2-alkene',
-    pageSource: 'পর্ব ২: পৃষ্ঠা ৩ (Page 3)',
-    html: `  <!-- SECTION B3: ELECTROPHILIC ADDITION, MARKOVNIKOV & ANTI-MARKOVNIKOV (From Page 3) -->
-  <section id="topic-markovnikov" class="topic-section">
+    title: '৬. ইলেকট্রোফিলিক সংযোজন ও মার্কনিকভের নীতি',
+    isMainTopic: true,
+    batch: 'batch-2',
+    html: `  <!-- SECTION B3: ELECTROPHILIC ADDITION, MARKOVNIKOV & ANTI-MARKOVNIKOV -->
+  <section class="topic-section" id="topic-markovnikov">
     <h2>অ্যালকিনের ইলেকট্রোফিলিক সংযোজন বিক্রিয়া (সাধারণ কৌশল)</h2>
 
-    <!-- Custom Adaptive SVG for General Mechanism & Ethene + HCl Curved Arrows -->
     <div class="svg-diagram">
       <svg viewBox="0 0 760 220" width="100%" height="220" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <!-- ================= LINE 1: General Alkene + A+ -> Carbonium Ion -> Adduct ================= -->
-        <!-- >C = C< -->
         <line x1="35" y1="44" x2="50" y2="54" />
         <line x1="35" y1="64" x2="50" y2="54" />
         <text x="53" y="60" fill="currentColor" stroke="none" font-size="18">C = C</text>
@@ -566,71 +556,56 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
         <line x1="115" y1="64" x2="102" y2="54" />
         <text x="45" y="88" fill="currentColor" stroke="none" font-size="14">(অ্যালকিন)</text>
 
-        <!-- Curved arrow on C=C bond -->
         <path d="M 78 44 Q 88 30 98 42" stroke="#38bdf8" stroke-width="1.8" fill="none" />
         <polygon points="99,44 93,39 98,36" fill="#38bdf8" stroke="none" />
 
         <text x="128" y="60" fill="currentColor" stroke="none" font-size="18">+</text>
         <text x="155" y="60" fill="currentColor" stroke="none" font-size="18" font-weight="bold">A<tspan dy="-6" font-size="13">+</tspan></text>
 
-        <!-- Curved arrow from C to A+ -->
         <path d="M 105 42 Q 135 20 160 40" stroke="#38bdf8" stroke-width="1.8" fill="none" />
         <polygon points="162,42 154,39 158,34" fill="#38bdf8" stroke="none" />
 
-        <!-- Reaction Arrow 1 -->
         <line x1="190" y1="54" x2="245" y2="54" />
         <polygon points="248,54 240,50 240,58" fill="currentColor" stroke="none" />
 
-        <!-- >C+ - C - A (Temporary Carbonium Ion) -->
         <line x1="265" y1="44" x2="280" y2="54" />
         <line x1="265" y1="64" x2="280" y2="54" />
         <text x="292" y="42" fill="currentColor" stroke="none" font-size="14" font-weight="bold">+</text>
         <text x="284" y="60" fill="currentColor" stroke="none" font-size="18">C – C – A</text>
-        <!-- Vertical bonds on the second C -->
         <line x1="326" y1="32" x2="326" y2="44" />
         <line x1="326" y1="64" x2="326" y2="76" />
         <text x="255" y="96" fill="currentColor" stroke="none" font-size="14">(অস্থায়ী কার্বোনিয়াম আয়ন)</text>
 
-        <!-- Reaction Arrow 2 (Fast step with B-) -->
         <text x="415" y="42" fill="currentColor" stroke="none" font-size="15">B<tspan dy="-5" font-size="12">−</tspan></text>
         <line x1="390" y1="54" x2="465" y2="54" />
         <polygon points="468,54 460,50 460,58" fill="currentColor" stroke="none" />
         <text x="405" y="73" fill="currentColor" stroke="none" font-size="13">খুব দ্রুত</text>
 
-        <!-- Final Adduct: B - C - C - A -->
         <text x="485" y="60" fill="currentColor" stroke="none" font-size="18">B – C – C – A</text>
-        <!-- Vertical bonds on both C atoms -->
         <line x1="524" y1="32" x2="524" y2="44" />
         <line x1="524" y1="64" x2="524" y2="76" />
         <line x1="561" y1="32" x2="561" y2="44" />
         <line x1="561" y1="64" x2="561" y2="76" />
         <text x="520" y="96" fill="currentColor" stroke="none" font-size="14">(যুত যৌগ)</text>
 
-        <!-- ================= LINE 2: CH2=CH2 + HCl -> CH2+-CH3 + Cl- -> ClCH2-CH3 ================= -->
         <text x="115" y="168" fill="currentColor" stroke="none" font-size="17">CH<tspan dy="3" font-size="12">2</tspan><tspan dy="-3"> = CH</tspan><tspan dy="3" font-size="12">2</tspan><tspan dy="-3"> + HCl</tspan><tspan dy="-6" font-size="12">−</tspan></text>
         <text x="128" y="148" fill="currentColor" stroke="none" font-size="13">+</text>
-        <!-- Curved arrow on CH2=CH2 -->
         <path d="M 156 152 Q 168 136 180 150" stroke="#38bdf8" stroke-width="1.8" fill="none" />
         <polygon points="181,152 175,147 180,144" fill="#38bdf8" stroke="none" />
 
-        <!-- Arrow 1 -->
         <line x1="275" y1="163" x2="328" y2="163" />
         <polygon points="331,163 323,159 323,167" fill="currentColor" stroke="none" />
 
-        <!-- Intermediate: +CH2 - CH3 + Cl- -->
         <text x="348" y="148" fill="currentColor" stroke="none" font-size="13">+</text>
         <text x="342" y="168" fill="currentColor" stroke="none" font-size="17">CH<tspan dy="3" font-size="12">2</tspan><tspan dy="-3"> – CH</tspan><tspan dy="3" font-size="12">3</tspan><tspan dy="-3"> + Cl</tspan><tspan dy="-6" font-size="12">−</tspan></text>
-        <!-- Curved arrow on intermediate -->
         <path d="M 355 150 Q 375 135 395 150" stroke="#38bdf8" stroke-width="1.8" fill="none" />
         <polygon points="396,152 389,148 393,144" fill="#38bdf8" stroke="none" />
         <text x="325" y="196" fill="currentColor" stroke="none" font-size="14">(ইথাইল কার্বোনিয়াম আয়ন)</text>
 
-        <!-- Arrow 2 -->
         <line x1="472" y1="163" x2="538" y2="163" />
         <polygon points="541,163 533,159 533,167" fill="currentColor" stroke="none" />
         <text x="485" y="153" fill="currentColor" stroke="none" font-size="13">খুব দ্রুত</text>
 
-        <!-- Product: ClCH2 - CH3 -->
         <text x="552" y="168" fill="currentColor" stroke="none" font-size="17">ClCH<tspan dy="3" font-size="12">2</tspan><tspan dy="-3"> – CH</tspan><tspan dy="3" font-size="12">3</tspan></text>
       </svg>
     </div>
@@ -640,26 +615,22 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
       <div class="drop-content">
         <p style="margin-top:0.75rem"><strong>মার্কনিকভের নীতি:</strong> “অপ্রতিসম অ্যালকিন এবং অপ্রতিসম বিকারকের সংযোজন বিক্রিয়ার ক্ষেত্রে বিকারক অণুর $\\ce{H}$ বা আপেক্ষিক ধনাত্মক ($\\delta+$) অংশ সেই কার্বনের সাথে যুক্ত হবে যার সাথে আগের থেকে যুক্ত $\\ce{H}$ সংখ্যা বেশি।” সুতরাং, মার্কনিকভের নীতিকে নিচের প্রবাদ দ্বারা প্রকাশ করা যায়- <em>“তেলা মাথায় তেল দেওয়া”</em>। এর মূল কারণ $\\rightarrow 2^\\circ$ কার্বোক্যাটায়ন $> 1^\\circ$ কার্বোক্যাটায়ন (স্থিতিশীলতা)</p>
 
-        <!-- Custom Adaptive SVG for Markovnikov Branched Diagram (90% / 10%) -->
         <div class="svg-diagram">
           <svg viewBox="0 0 780 155" width="100%" height="155" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <text x="20" y="88" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH=CH</tspan><tspan dy="3" font-size="11">2</tspan></text>
 
-            <!-- Curved arrow from double bond to H+Br- -->
             <path d="M 105 68 Q 145 42 182 65" stroke="#38bdf8" stroke-width="1.8" fill="none" />
             <polygon points="184,67 176,65 180,60" fill="#38bdf8" stroke="none" />
 
             <text x="172" y="76" fill="currentColor" stroke="none" font-size="15">H<tspan dy="-5" font-size="11">+</tspan><tspan dy="5">Br</tspan><tspan dy="-5" font-size="11">−</tspan></text>
             <line x1="150" y1="84" x2="235" y2="84" />
 
-            <!-- Branched Box Bracket -->
             <line x1="235" y1="42" x2="235" y2="122" />
             <line x1="235" y1="42" x2="275" y2="42" />
             <polygon points="278,42 270,38 270,46" fill="currentColor" stroke="none" />
             <line x1="235" y1="122" x2="275" y2="122" />
             <polygon points="278,122 270,118 270,126" fill="currentColor" stroke="none" />
 
-            <!-- Top Branch (2° Carbocation, 90%) -->
             <text x="323" y="29" fill="currentColor" stroke="none" font-size="13">+</text>
             <text x="288" y="46" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH–CH</tspan><tspan dy="3" font-size="11">3</tspan></text>
             <text x="280" y="68" fill="currentColor" stroke="none" font-size="14">2° কার্বোক্যাটায়ন (90%)</text>
@@ -671,7 +642,6 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
             <text x="525" y="46" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CHBr–CH</tspan><tspan dy="3" font-size="11">3</tspan></text>
             <text x="575" y="68" fill="currentColor" stroke="none" font-size="14">90%</text>
 
-            <!-- Bottom Branch (1° Carbocation, 10%) -->
             <text x="358" y="109" fill="currentColor" stroke="none" font-size="13">+</text>
             <text x="288" y="126" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH–CH</tspan><tspan dy="3" font-size="11">2</tspan></text>
             <text x="280" y="146" fill="currentColor" stroke="none" font-size="14">1° কার্বোক্যাটায়ন (10%)</text>
@@ -687,33 +657,27 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
 
         <p style="margin-top:1rem"><strong>এন্টিমার্কনিকভ নীতি/ বিপরীত মার্কনিকভ নীতি (খারাস এর পার অক্সাইড ফলাফল):</strong> $\\ce{R2O2}$ বা, $\\ce{H2O2}$ এর উপস্থিতিতে মার্কনিকভের নিয়মের ঠিক উল্টোটা ঘটে অর্থাৎ যে কার্বনে কম সংখ্যক $\\ce{H}$ যুক্ত আছে, বিকারকের $\\ce{H}$ সেই কার্বনে যুক্ত হয়। এর কারণ $2^\\circ \\text{ free radical} > 1^\\circ \\text{ free radical}$ (স্থিতিশীলতা)</p>
 
-        <!-- Custom Adaptive SVG for Anti-Markovnikov Branched & Cyclic Radical Diagram (99.1% / 0.9%) -->
         <div class="svg-diagram">
           <svg viewBox="0 0 780 185" width="100%" height="185" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <text x="15" y="88" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH=CH</tspan><tspan dy="3" font-size="11">2</tspan></text>
 
-            <!-- Reaction line with HBr / R2O2 -->
             <text x="165" y="76" fill="currentColor" stroke="none" font-size="15">HBr</text>
             <line x1="145" y1="84" x2="225" y2="84" />
             <text x="162" y="103" fill="currentColor" stroke="none" font-size="14">R<tspan dy="3" font-size="10">2</tspan><tspan dy="-3">O</tspan><tspan dy="3" font-size="10">2</tspan></text>
 
-            <!-- Downward arrow from R2O2 to Br• + ROH -->
             <line x1="180" y1="112" x2="180" y2="142" />
             <polygon points="180,145 176,137 184,137" fill="currentColor" stroke="none" />
             <text x="150" y="164" fill="currentColor" stroke="none" font-size="15">Br<tspan dy="-6" font-size="13">•</tspan><tspan dy="6">+ROH</tspan></text>
 
-            <!-- Curved loop arrow from Br• back to CH3-CH=CH2 -->
             <path d="M 145 160 Q 95 160 95 100" stroke="#38bdf8" stroke-width="1.8" fill="none" />
             <polygon points="95,97 91,105 99,105" fill="#38bdf8" stroke="none" />
 
-            <!-- Branched Box Bracket -->
             <line x1="225" y1="42" x2="225" y2="128" />
             <line x1="225" y1="42" x2="265" y2="42" />
             <polygon points="268,42 260,38 260,46" fill="currentColor" stroke="none" />
             <line x1="225" y1="128" x2="265" y2="128" />
             <polygon points="268,128 260,124 260,132" fill="currentColor" stroke="none" />
 
-            <!-- Top Branch: 2° Free Radical (99.1%) -->
             <text x="315" y="29" fill="currentColor" stroke="none" font-size="15">•</text>
             <text x="278" y="46" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH–CH</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">Br</tspan></text>
             <text x="305" y="66" fill="currentColor" stroke="none" font-size="13">2° মুক্ত মূলক</text>
@@ -726,7 +690,6 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
             <text x="530" y="46" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">–CH</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">Br</tspan></text>
             <text x="572" y="68" fill="currentColor" stroke="none" font-size="14">99.1%</text>
 
-            <!-- Bottom Branch: 1° Free Radical (0.9%) -->
             <text x="368" y="115" fill="currentColor" stroke="none" font-size="15">•</text>
             <text x="278" y="132" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CHBr–CH</tspan><tspan dy="3" font-size="11">2</tspan></text>
             <text x="285" y="152" fill="currentColor" stroke="none" font-size="14">1° মুক্তমূলক (0.9%)</text>
@@ -749,22 +712,375 @@ export const BATCH_2_ALKENE_SECTIONS: TopicItem[] = [
   }
 ];
 
-export const ALL_SECTIONS: TopicItem[] = [
-  ...BATCH_1_ALKANE_SECTIONS,
-  ...BATCH_2_ALKENE_SECTIONS
+/**
+ * Batch 3 (Pages 8, 9, and 10 from current upload):
+ * - Section C1 (id="topic-alkene-addition-ozonolysis"): অ্যালকিনের সংযোজন ও ওজোনীকরণ বিক্রিয়া (Ozonolysis)
+ * - Section C2 (id="topic-alkene-oxidation-tests"): প্রবল জারক দ্বারা অ্যালকিনের জারণ ও শনাক্তকরণ পরীক্ষা
+ */
+export const BATCH_3_SECTIONS: TopicItem[] = [
+  {
+    id: 'topic-alkene-addition-ozonolysis',
+    title: '৭. অ্যালকিনের সংযোজন ও ওজোনীকরণ বিক্রিয়া',
+    isMainTopic: true,
+    batch: 'batch-3',
+    html: `  <!-- SECTION C1: ALKENE ADDITION REACTIONS & OZONOLYSIS (From Page 8, 9 & Top of Page 10) -->
+  <section class="topic-section" id="topic-alkene-addition-ozonolysis">
+    <h2>অ্যালকিনের সংযোজন বিক্রিয়া</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>বিক্রিয়ার নাম</th>
+            <th>শর্ত ও প্রভাবক</th>
+            <th>বিক্রিয়া</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>$\\ce{H2}$ সংযোজন</td>
+            <td>$\\ce{Ni}, 150^\\circ - 200^\\circ\\text{C}$</td>
+            <td>
+              $$\\ce{R-CH=CH2 + H2 ->[\\ce{Ni}][150^\\circ-200^\\circ\\text{C}] R-CH2-CH3}$$
+            </td>
+          </tr>
+          <tr>
+            <td>$\\ce{X2}$ সংযোজন</td>
+            <td>-</td>
+            <td>
+              $$\\ce{R-CH=CH2 + X2 -> R-CHX-CH2X}$$
+            </td>
+          </tr>
+          <tr>
+            <td>$\\ce{HX}$ সংযোজন</td>
+            <td>-</td>
+            <td>
+              $$\\ce{R-CH=CH2 + HX -> R-CHX-CH3}$$
+            </td>
+          </tr>
+          <tr>
+            <td>$\\ce{HOX}$ সংযোজন</td>
+            <td>-</td>
+            <td>
+              $$\\underset{\\text{ইথিন}}{\\ce{CH2=CH2}} + \\ce{H\\overset{-}{O}\\overset{+}{Cl}} \\longrightarrow \\underset{\\text{ইথিলিন ক্লোরো হাইড্রিন}}{\\ce{ClCH2-CH2OH}}$$
+              $$\\underset{\\text{প্রোপিন বা প্রোপিলিন}}{\\ce{CH3CH=CH2}} + \\ce{H\\overset{-}{O}\\overset{+}{Br}} \\longrightarrow \\underset{\\text{প্রোপিলিন ব্রোমোহাইড্রিন বা 1-ব্রোমো-2-প্রোপানল}}{\\ce{CH3CH(OH)-CH2Br}}$$
+            </td>
+          </tr>
+          <tr>
+            <td>$\\ce{H2SO4}$ সংযোজন</td>
+            <td>-</td>
+            <td>
+              $$\\underset{\\text{অ্যালকিন-1}}{\\ce{R-CH=CH2}} + \\underset{\\text{সালফিউরিক এসিড}}{\\ce{H-OSO3H}} \\longrightarrow \\underset{\\text{iso-অ্যালকাইল হাইড্রোজেন সালফেট}}{\\ce{R-\\underset{\\underset{\\ce{OSO3H}}{|}}{C}H-CH3}} \\xrightarrow[\\Delta]{\\ce{H2O}} \\underset{2^\\circ \\text{ অ্যালকোহল}}{\\ce{R-\\underset{\\underset{\\ce{OH}}{|}}{C}H-CH3}} + \\ce{H2SO4}$$
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <details class="interactive-drop" open>
+      <summary>$\\ce{HOX}$ ও $\\ce{H2SO4}$ সংযোজন বিক্রিয়ার গুরুত্বপূর্ণ তথ্য ও কৌশল (Important Notes)</summary>
+      <div class="drop-content">
+        <p style="margin-top: 0.4rem;"><strong>$\\ce{HOX}$ সংযোজনের বৈশিষ্ট্য:</strong></p>
+        <ul>
+          <li>হাইপোহ্যালাস এসিড অ্যালকিনের সাথে বিক্রিয়ায় হ্যালোহাইড্রিন উৎপন্ন করে।</li>
+          <li>মার্কনিকভের নিয়ম এক্ষেত্রে অনুসৃত হয়; তবে $\\ce{OH-}$ মূলক ঋণাত্মক ও হ্যালোজেন পরমাণু ধনাত্মক ($\\ce{X+}$) রূপে ক্রিয়া করে।</li>
+        </ul>
+        <p style="margin-top: 0.6rem;"><strong>$\\ce{H2SO4}$ সংযোজনের বৈশিষ্ট্য:</strong></p>
+        <ul>
+          <li>কক্ষ তাপমাত্রায় গাঢ় $\\ce{H2SO4}$ অ্যালকিনের সঙ্গে যুত বিক্রিয়ায় অ্যালকাইল হাইড্রোজেন সালফেট গঠন করে।</li>
+          <li>এক্ষেত্রেও অপ্রতিসম অ্যালকিনের বেলায় মার্কনিকভের সূত্র প্রযোজ্য। উৎপন্ন যুত যৌগের আর্দ্র বিশ্লেষণে অ্যালকোহল উৎপন্ন হয়।</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="interactive-drop" open>
+      <summary>ওজোন সংযোজন বিক্রিয়া (ওজোনীকরণ বিক্রিয়া) ও দ্বিবন্ধনের অবস্থান নির্ণয়</summary>
+      <div class="drop-content">
+        <ul style="margin: 0.75rem 0 1rem 1.25rem;">
+          <li>অ্যালকিনের গঠন ও দ্বি-বন্ধনের অবস্থান অনুযায়ী অ্যালডিহাইড বা কিটোন ও $\\ce{H2O2}$ উৎপন্ন হয়।</li>
+          <li>$\\ce{Zn}$ ব্যবহার করলে নিম্নোক্ত বিক্রিয়া ঘটে যার ফলে $\\ce{H2O2}$ জারক হিসেবে কাজ করতে পারে না। নতুবা তা উৎপন্ন অ্যালডিহাইডকে জারিত করে কার্বক্সিলিক এসিডে পরিণত করতে পারে।
+            $$\\ce{Zn + H2O2 -> ZnO + H2O}$$
+          </li>
+          <li>$\\ce{H2O2}$ দুর্বল জারক বিধায় তা কিটোন $\\ce{CH3COCH3}$ কে জারিত করতে পারে না।</li>
+        </ul>
+
+        <p><strong>যেমন:</strong></p>
+
+        <!-- Custom Adaptive SVG for Ozonolysis Reactions (a), (b), and (c) -->
+        <div class="svg-diagram">
+          <svg viewBox="0 0 820 435" width="100%" height="435" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <!-- ================= REACTION (a): But-1-ene ================= -->
+            <text x="32" y="52" fill="currentColor" stroke="none" font-size="11">4</text>
+            <text x="72" y="52" fill="currentColor" stroke="none" font-size="11">3</text>
+            <text x="115" y="52" fill="currentColor" stroke="none" font-size="11">2</text>
+            <text x="160" y="52" fill="currentColor" stroke="none" font-size="11">1</text>
+            <text x="10" y="70" fill="currentColor" stroke="none" font-size="15">(a) CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">–CH = CH</tspan><tspan dy="3" font-size="11">2</tspan></text>
+
+            <text x="205" y="57" fill="currentColor" stroke="none" font-size="14">O<tspan dy="3" font-size="10">3</tspan></text>
+            <line x1="188" y1="65" x2="245" y2="65" />
+            <polygon points="248,65 240,61 240,69" fill="currentColor" stroke="none" />
+            <text x="193" y="83" fill="currentColor" stroke="none" font-size="14">CHCl<tspan dy="3" font-size="10">3</tspan></text>
+
+            <!-- Ozonide Ring (a) -->
+            <text x="255" y="70" fill="currentColor" stroke="none" font-size="15">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–CH</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">–HC</tspan></text>
+            <text x="372" y="38" fill="currentColor" stroke="none" font-size="15">O</text>
+            <line x1="352" y1="56" x2="369" y2="39" />
+            <line x1="398" y1="56" x2="383" y2="39" />
+            <text x="398" y="70" fill="currentColor" stroke="none" font-size="15">CH<tspan dy="3" font-size="11">2</tspan></text>
+            <line x1="352" y1="76" x2="352" y2="96" />
+            <line x1="398" y1="76" x2="398" y2="96" />
+            <text x="346" y="111" fill="currentColor" stroke="none" font-size="15">O</text>
+            <text x="392" y="111" fill="currentColor" stroke="none" font-size="15">O</text>
+            <line x1="361" y1="105" x2="389" y2="105" />
+            <!-- Dotted cleavage lines -->
+            <line x1="364" y1="32" x2="392" y2="62" stroke="#f59e0b" stroke-dasharray="3 3" />
+            <line x1="388" y1="32" x2="360" y2="62" stroke="#f59e0b" stroke-dasharray="3 3" />
+            <line x1="375" y1="92" x2="375" y2="118" stroke="#f59e0b" stroke-dasharray="3 3" />
+
+            <!-- Branched Arrows (a) -->
+            <line x1="430" y1="65" x2="452" y2="65" />
+            <polygon points="455,65 448,61 448,69" fill="currentColor" stroke="none" />
+            <line x1="458" y1="34" x2="458" y2="98" />
+            <line x1="458" y1="34" x2="525" y2="34" />
+            <polygon points="528,34 520,30 520,38" fill="currentColor" stroke="none" />
+            <text x="464" y="25" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">2</tspan><tspan dy="-3">O, Δ</tspan></text>
+            <text x="480" y="49" fill="currentColor" stroke="none" font-size="13">Zn</text>
+            <text x="536" y="39" fill="currentColor" stroke="none" font-size="15">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">CH</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">CHO + HCHO + ZnO</tspan></text>
+
+            <line x1="458" y1="98" x2="525" y2="98" />
+            <polygon points="528,98 520,94 520,102" fill="currentColor" stroke="none" />
+            <text x="464" y="89" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">2</tspan><tspan dy="-3">O, Δ</tspan></text>
+            <text x="536" y="103" fill="currentColor" stroke="none" font-size="15">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">CH</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">COOH + HCOOH + H</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">O</tspan></text>
+
+            <!-- ================= REACTION (b): But-2-ene ================= -->
+            <text x="38" y="182" fill="currentColor" stroke="none" font-size="11">4</text>
+            <text x="72" y="182" fill="currentColor" stroke="none" font-size="11">3</text>
+            <text x="118" y="182" fill="currentColor" stroke="none" font-size="11">2</text>
+            <text x="148" y="182" fill="currentColor" stroke="none" font-size="11">1</text>
+            <text x="10" y="200" fill="currentColor" stroke="none" font-size="15">(b) CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">.CH = CH.CH</tspan><tspan dy="3" font-size="11">3</tspan></text>
+
+            <text x="205" y="187" fill="currentColor" stroke="none" font-size="14">O<tspan dy="3" font-size="10">3</tspan></text>
+            <line x1="188" y1="195" x2="245" y2="195" />
+            <polygon points="248,195 240,191 240,199" fill="currentColor" stroke="none" />
+            <text x="193" y="213" fill="currentColor" stroke="none" font-size="14">CHCl<tspan dy="3" font-size="10">3</tspan></text>
+
+            <!-- Ozonide Ring (b) -->
+            <text x="275" y="200" fill="currentColor" stroke="none" font-size="15">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–HC</tspan></text>
+            <text x="362" y="168" fill="currentColor" stroke="none" font-size="15">O</text>
+            <line x1="342" y1="186" x2="359" y2="169" />
+            <line x1="388" y1="186" x2="373" y2="169" />
+            <text x="388" y="200" fill="currentColor" stroke="none" font-size="15">CHCH<tspan dy="3" font-size="11">3</tspan></text>
+            <line x1="342" y1="206" x2="342" y2="226" />
+            <line x1="388" y1="206" x2="388" y2="226" />
+            <text x="336" y="241" fill="currentColor" stroke="none" font-size="15">O</text>
+            <text x="382" y="241" fill="currentColor" stroke="none" font-size="15">O</text>
+            <line x1="351" y1="235" x2="379" y2="235" />
+            <line x1="354" y1="162" x2="382" y2="192" stroke="#f59e0b" stroke-dasharray="3 3" />
+            <line x1="378" y1="162" x2="350" y2="192" stroke="#f59e0b" stroke-dasharray="3 3" />
+            <line x1="365" y1="222" x2="365" y2="248" stroke="#f59e0b" stroke-dasharray="3 3" />
+
+            <!-- Branched Arrows (b) -->
+            <line x1="438" y1="195" x2="454" y2="195" />
+            <polygon points="457,195 450,191 450,199" fill="currentColor" stroke="none" />
+            <line x1="458" y1="164" x2="458" y2="228" />
+            <line x1="458" y1="164" x2="525" y2="164" />
+            <polygon points="528,164 520,160 520,168" fill="currentColor" stroke="none" />
+            <text x="464" y="155" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">2</tspan><tspan dy="-3">O, Δ</tspan></text>
+            <text x="480" y="179" fill="currentColor" stroke="none" font-size="13">Zn</text>
+            <text x="536" y="169" fill="currentColor" stroke="none" font-size="15">2CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3"> – CHO + ZnO</tspan></text>
+
+            <line x1="458" y1="228" x2="525" y2="228" />
+            <polygon points="528,228 520,224 520,232" fill="currentColor" stroke="none" />
+            <text x="464" y="219" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">2</tspan><tspan dy="-3">O, Δ</tspan></text>
+            <text x="536" y="233" fill="currentColor" stroke="none" font-size="15">2CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">COOH + H</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">O</tspan></text>
+
+            <!-- ================= REACTION (c): 2,3-Dimethylbut-2-ene ================= -->
+            <text x="10" y="345" fill="currentColor" stroke="none" font-size="15">(c)</text>
+            <text x="58" y="310" fill="currentColor" stroke="none" font-size="11">4</text>
+            <text x="38" y="324" fill="currentColor" stroke="none" font-size="14">H<tspan dy="3" font-size="10">3</tspan><tspan dy="-3">C</tspan></text>
+            <text x="38" y="366" fill="currentColor" stroke="none" font-size="14">H<tspan dy="3" font-size="10">3</tspan><tspan dy="-3">C</tspan></text>
+            <line x1="68" y1="324" x2="82" y2="338" />
+            <line x1="68" y1="358" x2="82" y2="344" />
+            <text x="84" y="330" fill="currentColor" stroke="none" font-size="11">3</text>
+            <text x="84" y="346" fill="currentColor" stroke="none" font-size="15">C = C</text>
+            <text x="115" y="330" fill="currentColor" stroke="none" font-size="11">2</text>
+            <line x1="126" y1="338" x2="140" y2="324" />
+            <line x1="126" y1="344" x2="140" y2="358" />
+            <text x="150" y="310" fill="currentColor" stroke="none" font-size="11">1</text>
+            <text x="142" y="324" fill="currentColor" stroke="none" font-size="14">CH<tspan dy="3" font-size="10">3</tspan></text>
+            <text x="142" y="366" fill="currentColor" stroke="none" font-size="14">CH<tspan dy="3" font-size="10">3</tspan></text>
+
+            <text x="195" y="332" fill="currentColor" stroke="none" font-size="14">O<tspan dy="3" font-size="10">3</tspan></text>
+            <line x1="180" y1="340" x2="232" y2="340" />
+            <polygon points="235,340 227,336 227,344" fill="currentColor" stroke="none" />
+            <text x="183" y="358" fill="currentColor" stroke="none" font-size="14">CHCl<tspan dy="3" font-size="10">3</tspan></text>
+
+            <!-- Ozonide Ring (c) -->
+            <text x="242" y="326" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">3</tspan><tspan dy="-3">C</tspan></text>
+            <text x="242" y="362" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">3</tspan><tspan dy="-3">C</tspan></text>
+            <line x1="270" y1="326" x2="282" y2="338" />
+            <line x1="270" y1="354" x2="282" y2="342" />
+            <text x="284" y="346" fill="currentColor" stroke="none" font-size="15">C</text>
+
+            <text x="312" y="314" fill="currentColor" stroke="none" font-size="15">O</text>
+            <line x1="294" y1="332" x2="310" y2="315" />
+            <line x1="338" y1="332" x2="323" y2="315" />
+
+            <text x="338" y="346" fill="currentColor" stroke="none" font-size="15">C</text>
+            <line x1="350" y1="338" x2="362" y2="326" />
+            <line x1="350" y1="342" x2="362" y2="354" />
+            <text x="365" y="326" fill="currentColor" stroke="none" font-size="13">CH<tspan dy="3" font-size="9">3</tspan></text>
+            <text x="365" y="362" fill="currentColor" stroke="none" font-size="13">CH<tspan dy="3" font-size="9">3</tspan></text>
+
+            <line x1="290" y1="352" x2="290" y2="372" />
+            <line x1="342" y1="352" x2="342" y2="372" />
+            <text x="284" y="387" fill="currentColor" stroke="none" font-size="15">O</text>
+            <text x="336" y="387" fill="currentColor" stroke="none" font-size="15">O</text>
+            <line x1="299" y1="381" x2="331" y2="381" />
+            <line x1="304" y1="308" x2="332" y2="338" stroke="#f59e0b" stroke-dasharray="3 3" />
+            <line x1="328" y1="308" x2="300" y2="338" stroke="#f59e0b" stroke-dasharray="3 3" />
+            <line x1="316" y1="368" x2="316" y2="394" stroke="#f59e0b" stroke-dasharray="3 3" />
+
+            <!-- Branched Arrows (c) -->
+            <line x1="402" y1="340" x2="424" y2="340" />
+            <polygon points="427,340 420,336 420,344" fill="currentColor" stroke="none" />
+            <line x1="430" y1="310" x2="430" y2="374" />
+            <line x1="430" y1="310" x2="495" y2="310" />
+            <polygon points="498,310 490,306 490,314" fill="currentColor" stroke="none" />
+            <text x="436" y="301" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">2</tspan><tspan dy="-3">O, Δ</tspan></text>
+            <text x="452" y="325" fill="currentColor" stroke="none" font-size="13">Zn</text>
+            <text x="506" y="315" fill="currentColor" stroke="none" font-size="15">2CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">COCH</tspan><tspan dy="3" font-size="11">3</tspan><tspan dy="-3"> + ZnO</tspan></text>
+
+            <line x1="430" y1="374" x2="495" y2="374" />
+            <polygon points="498,374 490,370 490,378" fill="currentColor" stroke="none" />
+            <text x="436" y="365" fill="currentColor" stroke="none" font-size="13">H<tspan dy="3" font-size="9">2</tspan><tspan dy="-3">O, Δ</tspan></text>
+            <text x="506" y="379" fill="currentColor" stroke="none" font-size="15">2CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">COCH</tspan><tspan dy="3" font-size="11">3</tspan><tspan dy="-3"> + H</tspan><tspan dy="3" font-size="11">2</tspan><tspan dy="-3">O</tspan><tspan dy="3" font-size="11">2</tspan></text>
+          </svg>
+        </div>
+
+        <p style="margin-top: 1rem;"><strong>তাহলে দ্বিবন্ধনের অবস্থান বের করার জন্য-</strong></p>
+        <ul>
+          <li>(i) মনে মনে উৎপাদ দুটিকে জোড়া লাগাও।</li>
+          <li>(ii) যে বরাবর যুক্ত করবে সেই বরাবর দ্বিবন্ধন চিন্তা কর এবং</li>
+          <li>(iii) উৎপাদ দুটির প্রতিটি থেকে $\\ce{O}$ পরমাণু বাদ দিয়ে চিন্তা করবে কারণ, $\\ce{O}$ পরমাণুটি ওজোন থেকে এসেছিল।</li>
+        </ul>
+
+        <p style="margin-top: 0.75rem;"><strong>উদাহরণ:</strong> একটি অ্যালকিনকে ওজোনোলাইসিস করে এক অণু প্রোপানোন ও এক অণু ইথান্যাল পাওয়া গেল। অ্যালকিনটি বের করতে হবে।</p>
+
+        <!-- Custom Adaptive SVG for Ozonolysis Double-Bond Reconstruction Trick (Page 10 Top) -->
+        <div class="svg-diagram">
+          <svg viewBox="0 0 780 115" width="100%" height="115" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <text x="18" y="48" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–C</tspan></text>
+            <text x="82" y="48" fill="currentColor" stroke="none" font-size="16">= O</text>
+            <text x="126" y="48" fill="currentColor" stroke="none" font-size="16">O =</text>
+            <text x="165" y="48" fill="currentColor" stroke="none" font-size="16">C–CH<tspan dy="3" font-size="11">3</tspan></text>
+            <!-- Dashed Box around = O   O = -->
+            <rect x="76" y="26" width="84" height="30" stroke="#38bdf8" stroke-dasharray="4 3" rx="3" />
+            <!-- Vertical bonds on left C (H) and right C (CH3) -->
+            <line x1="64" y1="55" x2="64" y2="72" />
+            <text x="58" y="88" fill="currentColor" stroke="none" font-size="15">H</text>
+            <line x1="171" y1="55" x2="171" y2="72" />
+            <text x="159" y="88" fill="currentColor" stroke="none" font-size="15">CH<tspan dy="3" font-size="11">3</tspan></text>
+
+            <!-- Reaction Arrow -->
+            <line x1="232" y1="43" x2="275" y2="43" />
+            <polygon points="278,43 270,39 270,47" fill="currentColor" stroke="none" />
+
+            <!-- Resulting Alkene: CH3 - C(H) = C(CH3) - CH3 -->
+            <text x="290" y="48" fill="currentColor" stroke="none" font-size="16">CH<tspan dy="3" font-size="11">3</tspan><tspan dy="-3">–C = C–CH</tspan><tspan dy="3" font-size="11">3</tspan></text>
+            <line x1="337" y1="55" x2="337" y2="72" />
+            <text x="331" y="88" fill="currentColor" stroke="none" font-size="15">H</text>
+            <line x1="373" y1="55" x2="373" y2="72" />
+            <text x="362" y="88" fill="currentColor" stroke="none" font-size="15">CH<tspan dy="3" font-size="11">3</tspan></text>
+
+            <!-- Bracketed Explanation Note -->
+            <text x="435" y="62" fill="currentColor" stroke="none" font-size="14">[ডটগুলো শুধু কৌশলটি বোঝানোর জন্য ব্যবহার করা হয়েছে]</text>
+          </svg>
+        </div>
+
+        <p>সুতরাং, অ্যালকিনটি হলো <strong>২-মিথাইলবিউট-২-ইন</strong>।</p>
+      </div>
+    </details>
+  </section>`
+  },
+  {
+    id: 'topic-alkene-oxidation-tests',
+    title: '৮. অ্যালকিনের জারণ ও শনাক্তকরণ পরীক্ষা',
+    isMainTopic: true,
+    batch: 'batch-3',
+    html: `  <!-- SECTION C2: ALKENE OXIDATION, IDENTIFICATION TESTS & ALKENYL RADICALS (From Page 10) -->
+  <section class="topic-section" id="topic-alkene-oxidation-tests">
+    <h2>প্রবল জারক দ্বারা অ্যালকিনের জারণ</h2>
+    $$\\underset{\\text{অ্যালকিন-1}}{\\ce{R-CH=CH2}} + \\ce{5[O]} \\xrightarrow[\\ce{H2SO4}]{\\text{উত্তপ্ত } \\ce{KMnO4}} \\underset{\\text{কার্বক্সিলিক এসিড}}{\\ce{R-COOH}} + \\ce{CO2 + H2O}$$
+    $$\\underset{\\text{প্রোপিন}}{\\ce{CH3-CH=CH2}} + \\ce{5[O]} \\xrightarrow[\\ce{H2SO4}]{\\text{উত্তপ্ত } \\ce{KMnO4}} \\underset{\\text{ইথানোয়িক এসিড}}{\\ce{CH3COOH}} + \\ce{CO2 + H2O}$$
+
+    <h2>অ্যালকিনের শনাক্তকরণ</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>শনাক্তকারী পরীক্ষা</th>
+            <th>শনাক্তকরণে ব্যবহৃত বিকারক</th>
+            <th>বিক্রিয়া</th>
+            <th>পর্যবেক্ষণ/পরিবর্তন</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ব্রোমিন দ্রবণ পরীক্ষা</td>
+            <td>$\\ce{Br2(CCl4)}$</td>
+            <td>
+              $$\\ce{R-CH=CH2 + Br2 ->[\\ce{CCl4}] R-CHBr-CH2Br}$$
+            </td>
+            <td>লাল বর্ণের দ্রবণ বর্ণহীন হয়</td>
+          </tr>
+          <tr>
+            <td>বেয়ার পরীক্ষা</td>
+            <td>ক্ষারীয় $\\ce{KMnO4}$</td>
+            <td>
+              $$\\ce{2KMnO4 + 2KOH -> 2K2MnO4 + H2O + [O]}$$
+              $$\\ce{R-CH=CH2 + H2O + [O] ->[\\ce{KMnO4}][\\ce{KOH}] R-\\overset{\\overset{\\ce{OH}}{|}}{C}H-\\overset{\\overset{\\ce{OH}}{|}}{C}H2}$$
+            </td>
+            <td>গোলাপি বর্ণের দ্রবণ বর্ণহীন হয়</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <details class="interactive-drop" open>
+      <summary>Good to know: অ্যালকিনাইল মূলক, ভিনাইল মূলক ও অ্যালাইল মূলক</summary>
+      <div class="drop-content">
+        <ul>
+          <li>অ্যালকিন অণু থেকে একটি $\\ce{H}$ পরমাণুকে অপসারিত করলে যে একযোজী মূলক সৃষ্টি হয়, তাকে <strong>“অ্যালকিনাইল মূলক”</strong> বলে। অনেকটা অ্যালকেন হতে অ্যালকাইল মূলক এর অনুরূপ।</li>
+          <li>ইথিন ($\\ce{CH2=CH2}$) থেকে সৃষ্ট মূলক হল <strong>ভিনাইল মূলক</strong> ($\\ce{CH2=CH-}$)।</li>
+          <li>প্রোপিন ($\\ce{CH3-CH=CH2}$) থেকে সৃষ্ট মূলক হল <strong>প্রোপিনাইল বা অ্যালাইল মূলক</strong> ($\\ce{CH2=CH-CH2-}$)।</li>
+        </ul>
+      </div>
+    </details>
+  </section>`
+  }
 ];
 
-export function getRawBatch2SectionsHtml(): string {
-  return BATCH_2_ALKENE_SECTIONS.map((s) => s.html).join('\n\n');
+export const ALL_SECTIONS: TopicItem[] = [
+  ...BATCH_1_SECTIONS,
+  ...BATCH_2_SECTIONS,
+  ...BATCH_3_SECTIONS
+];
+
+export const MAIN_NAVIGATION_TOPICS: TopicItem[] = ALL_SECTIONS.filter(
+  (s) => s.isMainTopic !== false
+);
+
+export function getRawBatch3SectionsHtml(): string {
+  return BATCH_3_SECTIONS.map((s) => s.html).join('\n\n');
+}
+
+export function getBatch3NavigationLinksHtml(): string {
+  return BATCH_3_SECTIONS.map(
+    (s) =>
+      `  <a class="topic-link" href="#${s.id}" onclick="togglePanel('topic-panel')">${s.title}</a>`
+  ).join('\n');
 }
 
 export function getAllSectionsHtml(): string {
   return ALL_SECTIONS.map((s) => s.html).join('\n\n');
-}
-
-export function filterSectionsByCategory(
-  category: 'all' | 'batch-1-alkane' | 'batch-2-alkene'
-): TopicItem[] {
-  if (category === 'all') return ALL_SECTIONS;
-  return ALL_SECTIONS.filter((s) => s.category === category);
 }

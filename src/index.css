@@ -41,6 +41,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-main);
@@ -78,6 +82,7 @@ body {
   padding: clamp(1.25rem, 3vw, 2.25rem);
   margin-bottom: 2rem;
   backdrop-filter: blur(12px);
+  scroll-margin-top: 1.5rem;
 }
 
 .topic-badge {
@@ -178,10 +183,14 @@ details.interactive-drop summary::-webkit-details-marker {
 }
 
 details.interactive-drop summary::after {
-  content: "＋";
-  font-weight: bold;
+  content: "+";
+  font-size: 1.3rem;
+  line-height: 1;
+  font-weight: 700;
   color: var(--accent);
   transition: transform 0.25s ease;
+  margin-left: 0.75rem;
+  flex-shrink: 0;
 }
 
 details[open].interactive-drop summary::after {
@@ -225,6 +234,13 @@ details[open].interactive-drop summary::after {
   border-radius: 12px;
   border: 1px dashed var(--border);
   margin: 1rem 0;
+}
+
+.svg-diagram svg {
+  min-width: 620px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 /* On-Demand Floating Controls */
