@@ -26,6 +26,7 @@ import {
   isAuthorizedAdminEmail,
   PRIMARY_ADMIN_EMAIL,
   shouldEnableLowEndEfficiency,
+  splitSubjectsByCategory,
 } from './libraryCatalog.ts';
 
 test('All 5 batches contain the expected 13 sections and 12 main navigation topics', () => {
@@ -105,17 +106,27 @@ test('Sidebar folder hierarchy includes all classes from Class 1 to 8, Class 9-1
   }
 });
 
-test('Home Page Subject+Paper cards filter dynamically when student configures Class in profile', () => {
-  const defaultCards = getSubjectPaperCards(BUILT_IN_PAGES, 'ALL');
+test('Home Page Subject+Paper cards show all subjects with class on Home (ALL) and only the student class subjects in My Class', () => {
+  const homeCards = getSubjectPaperCards(BUILT_IN_PAGES, 'ALL');
   assert.ok(
-    defaultCards.some((c) => c.displayName === 'Chemistry 2nd Paper'),
-    'Default home page shows Chemistry 2nd Paper'
+    homeCards.some((c) => c.className === 'Class 11-12 (HSC)'),
+    'Global Home page includes HSC subjects'
+  );
+  assert.ok(
+    homeCards.some((c) => c.className === 'Class 9-10 (SSC)'),
+    'Global Home page includes SSC subjects'
+  );
+
+  const hscOnlyCards = getSubjectPaperCards(BUILT_IN_PAGES, 'Class 11-12 (HSC)');
+  assert.ok(
+    hscOnlyCards.every((c) => c.className === 'Class 11-12 (HSC)'),
+    'When student is in HSC (My Class), only HSC subjects appear (no SSC books)'
   );
 
   const sscCards = getSubjectPaperCards(BUILT_IN_PAGES, 'Class 9-10 (SSC)');
   assert.ok(
     sscCards.every((c) => c.className === 'Class 9-10 (SSC)'),
-    'When student sets Class 9-10 (SSC), only SSC subjects appear on Home Page'
+    'When student sets Class 9-10 (SSC), only SSC subjects appear'
   );
 
   const class7Cards = getSubjectPaperCards(BUILT_IN_PAGES, 'Class 7');
@@ -259,4 +270,133 @@ test('shouldEnableLowEndEfficiency detects low-end hardware and respects user ov
   );
 });
 
+test('splitSubjectsByCategory orders HSC and SSC subjects into Section 1 (Compulsory) and Section 2 (Divisional P, C, H.M, B)', () => {
+  const hscCards = getSubjectPaperCards(BUILT_IN_PAGES, 'Class 11-12 (HSC)');
+  const hscSplit = splitSubjectsByCategory(hscCards);
 
+  // HSC Compulsory: Bangla 1st & 2nd, English 1st & 2nd, ICT = 5 papers
+  assert.equal(hscSplit.compulsory.length, 5);
+  assert.deepEqual(
+    hscSplit.compulsory.map((c) => c.displayName),
+    [
+      'Bangla 1st Paper',
+      'Bangla 2nd Paper',
+      'English 1st Paper',
+      'English 2nd Paper',
+      'ICT',
+    ]
+  );
+
+  // HSC Divisional: Physics 1st & 2nd, Chemistry 1st & 2nd, Higher Math 1st & 2nd, Biology 1st & 2nd = 8 papers
+  assert.equal(hscSplit.divisional.length, 8);
+  assert.deepEqual(
+    hscSplit.divisional.map((c) => c.displayName),
+    [
+      'Physics 1st Paper',
+      'Physics 2nd Paper',
+      'Chemistry 1st Paper',
+      'Chemistry 2nd Paper',
+      'Higher Math 1st Paper',
+      'Higher Math 2nd Paper',
+      'Biology 1st Paper',
+      'Biology 2nd Paper',
+    ]
+  );
+
+  // SSC Compulsory: Bangla 1st & 2nd, English 1st & 2nd, General Math, ICT, Bangladesh and Global Studies, Religion (4 faiths) = 11 papers
+  const sscCards = getSubjectPaperCards(BUILT_IN_PAGES, 'Class 9-10 (SSC)');
+  const sscSplit = splitSubjectsByCategory(sscCards);
+  assert.equal(sscSplit.compulsory.length, 11);
+  assert.ok(
+    sscSplit.compulsory.some((c) => c.subject === 'General Math' && c.chapterCount === 17),
+    'SSC Compulsory must include General Math with 17 chapters'
+  );
+  assert.ok(
+    sscSplit.compulsory.some(
+      (c) => c.subject === 'Bangladesh and Global Studies' && c.chapterCount === 16
+    ),
+    'SSC Compulsory must include Bangladesh and Global Studies with 16 chapters'
+  );
+
+  // SSC Divisional: Physics (14 ch), Chemistry (12 ch), Higher Math (14 ch), Biology (14 ch) = 4 papers
+  assert.equal(sscSplit.divisional.length, 4);
+  assert.deepEqual(
+    sscSplit.divisional.map((c) => [c.subject, c.chapterCount, c.subjectCode]),
+    [
+      ['Physics', 14, '136'],
+      ['Chemistry', 12, '137'],
+      ['Higher Math', 14, '126'],
+      ['Biology', 14, '138'],
+    ]
+  );
+
+  // Clean display names: no "(SSC)" or "(Main Paper)" suffix
+  for (const card of [...hscCards, ...sscCards]) {
+    assert.ok(
+      !card.displayName.includes('(SSC)'),
+      `Display name "${card.displayName}" should not contain (SSC)`
+    );
+    assert.ok(
+      !card.displayName.includes('Main Paper'),
+      `Display name "${card.displayName}" should not contain Main Paper`
+    );
+  }
+});
+
+test('Bangla and English papers have clickable semiChapters (Units, Prose, Poetry, Grammar) and Classes 1 to 8 are fully populated', () => {
+  // HSC Bangla 1st Paper has 3 sections (Prose, Poetry, Co-reader) and 26 semi-chapters (12 prose + 12 poetry + 2 co-reader)
+  const hscBangla1 = getChaptersForSubjectPaper(
+    BUILT_IN_PAGES,
+    'Class 11-12 (HSC)',
+    'Bangla',
+    '1st Paper'
+  );
+  assert.equal(hscBangla1.length, 3);
+  const totalBangla1Semi = hscBangla1.reduce(
+    (sum, ch) => sum + ch.semiChapters.length,
+    0
+  );
+  assert.equal(totalBangla1Semi, 26);
+
+  // HSC English 1st Paper has 2 sections (Reading Units & Guided Writing) with 17 semi-chapters (12 Units + 5 Writing items)
+  const hscEng1 = getChaptersForSubjectPaper(
+    BUILT_IN_PAGES,
+    'Class 11-12 (HSC)',
+    'English',
+    '1st Paper'
+  );
+  assert.equal(hscEng1.length, 2);
+  const totalEng1Semi = hscEng1.reduce(
+    (sum, ch) => sum + ch.semiChapters.length,
+    0
+  );
+  assert.equal(totalEng1Semi, 17);
+
+  // Verify Class 1 to Class 8 all have curriculum subjects and chapters
+  const classes1To8 = [
+    'Class 8',
+    'Class 7',
+    'Class 6',
+    'Class 5',
+    'Class 4',
+    'Class 3',
+    'Class 2',
+    'Class 1',
+  ];
+  for (const cls of classes1To8) {
+    const cards = getSubjectPaperCards(BUILT_IN_PAGES, cls);
+    assert.ok(cards.length >= 3, `${cls} should have at least 3 subjects`);
+    for (const card of cards) {
+      assert.ok(
+        card.chapterCount > 0,
+        `${cls} ${card.subject} should have chapters`
+      );
+      if (card.subject === 'Bangla' || card.subject === 'English') {
+        assert.ok(
+          (card.semiChapterCount || 0) > 0,
+          `${cls} ${card.subject} should have clickable semi-chapters`
+        );
+      }
+    }
+  }
+});

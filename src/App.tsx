@@ -42,7 +42,9 @@ import {
   LibraryTopicPage,
   normalizeClassName,
   PRIMARY_ADMIN_EMAIL,
+  SemiChapterItem,
   shouldEnableLowEndEfficiency,
+  splitSubjectsByCategory,
   SubjectPaperCard,
 } from './utils/libraryCatalog';
 import {
@@ -281,10 +283,14 @@ export default function App() {
     [customPages]
   );
 
-  // Currently selected page for the Reader
+  // Currently selected page for the Reader (or direct Semi-Chapter when a semi-chapter is opened directly)
   const [activePageId, setActivePageId] = useState<string>(
     BUILT_IN_PAGES[0].id
   );
+  const [activeSemiChapter, setActiveSemiChapter] = useState<{
+    chapter: ChapterItem;
+    semi: SemiChapterItem;
+  } | null>(null);
   const activePage = useMemo(
     () => allPages.find((p) => p.id === activePageId) || BUILT_IN_PAGES[0],
     [allPages, activePageId]
@@ -317,7 +323,18 @@ export default function App() {
   const [profileStatusMsg, setProfileStatusMsg] = useState<string>('');
 
   // Drill-down & Filter states: Class -> Subject + Paper -> Chapter -> Topic
-  const [selectedClass, setSelectedClass] = useState<string>('ALL');
+  // When the student has configured their class in their profile/device, default directly to their class so they only see their class's subjects
+  const [selectedClass, setSelectedClass] = useState<string>(() => {
+    try {
+      const savedClass = localStorage.getItem(LOCAL_STUDENT_CLASS_KEY);
+      if (savedClass && savedClass.trim()) {
+        return normalizeClassName(savedClass);
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return 'ALL';
+  });
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
   const [selectedPaper, setSelectedPaper] = useState<string>('ALL');
   const [selectedChapter, setSelectedChapter] = useState<string>('ALL');
@@ -625,6 +642,9 @@ export default function App() {
             if (typeof data.studentClass === 'string') {
               setStudentClass(data.studentClass);
               localStorage.setItem(LOCAL_STUDENT_CLASS_KEY, data.studentClass);
+              if (data.studentClass.trim()) {
+                setSelectedClass(normalizeClassName(data.studentClass));
+              }
             }
             if (typeof data.schoolName === 'string') {
               setSchoolName(data.schoolName);
@@ -740,19 +760,23 @@ export default function App() {
     [allPages]
   );
 
-  // Effective class filter for the Home Page:
-  // If the user explicitly clicked a class in the Sidebar or Search Filter, use `selectedClass`.
-  // Otherwise, if the student set their optional Class in their profile (`studentClass`), show ONLY their class on the Home Page!
+  // Effective class filter for the Subjects View:
+  // - 'ALL' = Global Home page (where all subjects with their class are shown + option to quickly find My Class)
+  // - Specific class (e.g. 'Class 11-12 (HSC)') = Only that class's subjects are shown
   const effectiveHomeClassFilter = useMemo(() => {
-    if (selectedClass !== 'ALL') return selectedClass;
-    if (studentClass.trim()) return normalizeClassName(studentClass);
+    if (selectedClass !== 'ALL') return normalizeClassName(selectedClass);
     return 'ALL';
-  }, [selectedClass, studentClass]);
+  }, [selectedClass]);
 
-  // Stage 1: Subject + Paper cards on the Home Page
+  // Stage 1: Subject + Paper cards on the Home Page, split into Section 1 (Compulsory) & Section 2 (Divisional: P, C, H.M, B)
   const subjectPaperCards = useMemo(
     () => getSubjectPaperCards(allPages, effectiveHomeClassFilter),
     [allPages, effectiveHomeClassFilter]
+  );
+
+  const groupedSubjectSections = useMemo(
+    () => splitSubjectsByCategory(subjectPaperCards),
+    [subjectPaperCards]
   );
 
   // Stage 2: Chapters list for the currently selected Subject + Paper
@@ -859,6 +883,7 @@ export default function App() {
 
   // Scroll to a main topic section smoothly
   const handleSelectTopicSection = (sectionId: string, pageId?: string) => {
+    setActiveSemiChapter(null);
     if (pageId) {
       setActivePageId(pageId);
     }
@@ -945,8 +970,10 @@ export default function App() {
       // ignore local storage errors
     }
 
-    // Reset manual sidebar class override so their new profile class takes effect on the Home Page
-    setSelectedClass('ALL');
+    // Switch directly to the student's saved class so they only see their class's subjects (or Home 'ALL' if cleared)
+    setSelectedClass(
+      trimmedClass ? normalizeClassName(trimmedClass) : 'ALL'
+    );
     setHomeStage('subjects');
 
     if (!user) {
@@ -1095,6 +1122,7 @@ export default function App() {
     setNewPageTitle('');
     setNewPageHtml('');
     setUploadStatusMsg('New topic page added to the library successfully!');
+    setActiveSemiChapter(null);
     setActivePageId(pageId);
     setUploadModalOpen(false);
     setViewMode('reader');
@@ -1146,15 +1174,32 @@ export default function App() {
     }
   };
 
-  // Navigate to Stage 1: All Subjects
+  // Navigate to Stage 1: Subjects (either 'ALL' for Home or a specific class for My Class)
   const goToSubjectsStage = (cls: string = 'ALL') => {
     setSelectedClass(cls);
     setSelectedSubject('ALL');
     setSelectedPaper('ALL');
     setSelectedChapter('ALL');
+    setActiveSemiChapter(null);
     setHomeStage('subjects');
     setViewMode('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Quickly set & jump to the student's class from the Home page
+  const handleQuickFindMyClass = (cls: string) => {
+    if (!cls || cls === 'ALL') {
+      goToSubjectsStage('ALL');
+      return;
+    }
+    const normalized = normalizeClassName(cls);
+    setStudentClass(normalized);
+    try {
+      localStorage.setItem(LOCAL_STUDENT_CLASS_KEY, normalized);
+    } catch {
+      // ignore storage errors
+    }
+    goToSubjectsStage(normalized);
   };
 
   // Navigate to Stage 2: Chapters of a Subject + Paper
@@ -1167,6 +1212,7 @@ export default function App() {
     setSelectedSubject(subject);
     setSelectedPaper(paper);
     setSelectedChapter('ALL');
+    setActiveSemiChapter(null);
     setHomeStage('chapters');
     setViewMode('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1175,8 +1221,26 @@ export default function App() {
   // Navigate to Stage 3: Expanded Chapter Topics Page
   const goToExpandedChapterStage = (chapterTitle: string) => {
     setSelectedChapter(chapterTitle);
+    setActiveSemiChapter(null);
     setHomeStage('topics');
     setViewMode('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Directly open a Semi-Chapter (Unit / Prose / Poetry / Grammar / Composition) into the Reader page
+  const handleOpenSemiChapter = (chap: ChapterItem, semi: SemiChapterItem) => {
+    setSelectedClass(chap.className);
+    setSelectedSubject(chap.subject);
+    setSelectedPaper(chap.paper);
+    setSelectedChapter(chap.chapterTitle);
+    if (semi.page) {
+      setActiveSemiChapter(null);
+      setActivePageId(semi.page.id);
+    } else {
+      setActiveSemiChapter({ chapter: chap, semi });
+    }
+    setViewMode('reader');
+    autoCloseSidebarOnMobile();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1283,13 +1347,16 @@ export default function App() {
                     setSelectedPaper(p.paper);
                     setSelectedChapter(p.chapter);
                     setHomeStage('topics');
+                    setActiveSemiChapter(null);
                     setActivePageId(p.id);
                     setViewMode('reader');
                     autoCloseSidebarOnMobile();
                   }}
                   style={{ paddingLeft: `${(depth + 1) * 12 + 24}px` }}
                   className={`w-full flex items-center justify-between py-1.5 pr-3 rounded-xl text-left text-xs transition-all duration-200 ${
-                    activePage.id === p.id && viewMode === 'reader'
+                    activePage.id === p.id &&
+                    !activeSemiChapter &&
+                    viewMode === 'reader'
                       ? 'bg-[var(--accent-soft)] text-[var(--accent)] font-semibold'
                       : 'hover:bg-[var(--surface-subtle)] opacity-85'
                   }`}
@@ -1305,17 +1372,27 @@ export default function App() {
   };
 
   // Clean header title:
-  // In Reader mode: ONLY "Chapter Name : Topic Name"
+  // In Reader mode: ONLY "Chapter Name : Topic Name" (or "Section : Semi-Chapter Name")
   // In Home mode: Reflects the active stage ("Web Books", "Chemistry 2nd Paper", or "2nd Chapter: Organic Chemistry")
   const headerDisplayTitle = useMemo(() => {
     if (viewMode === 'reader') {
+      if (activeSemiChapter) {
+        return formatCleanReaderHeader(
+          activeSemiChapter.chapter.chapterTitle,
+          activeSemiChapter.semi.banglaTitle || activeSemiChapter.semi.title
+        );
+      }
       return formatCleanReaderHeader(activePage.chapter, activePage.title);
     }
     if (homeStage === 'topics' && activeExpandedChapter) {
       return activeExpandedChapter.chapterTitle;
     }
     if (homeStage === 'chapters' && selectedSubject !== 'ALL') {
-      return selectedPaper !== 'ALL' && selectedPaper !== 'Single Paper'
+      return selectedPaper !== 'ALL' &&
+        selectedPaper !== 'Single Paper' &&
+        selectedPaper !== 'Main Paper' &&
+        selectedPaper !== 'SSC' &&
+        selectedPaper !== 'HSC'
         ? `${selectedSubject} ${selectedPaper}`
         : selectedSubject;
     }
@@ -1323,6 +1400,7 @@ export default function App() {
   }, [
     viewMode,
     activePage,
+    activeSemiChapter,
     homeStage,
     activeExpandedChapter,
     selectedSubject,
@@ -1332,15 +1410,22 @@ export default function App() {
   // Dynamically synchronize document.title across browser tabs and mobile browsers
   useEffect(() => {
     if (viewMode === 'reader') {
-      document.title = `${formatCleanReaderHeader(
-        activePage.chapter,
-        activePage.title
-      )} — Web Books by Afeed`;
+      const readerTitle = activeSemiChapter
+        ? formatCleanReaderHeader(
+            activeSemiChapter.chapter.chapterTitle,
+            activeSemiChapter.semi.banglaTitle || activeSemiChapter.semi.title
+          )
+        : formatCleanReaderHeader(activePage.chapter, activePage.title);
+      document.title = `${readerTitle} — Web Books by Afeed`;
     } else if (homeStage === 'topics' && activeExpandedChapter) {
       document.title = `${activeExpandedChapter.chapterTitle} — Web Books by Afeed`;
     } else if (homeStage === 'chapters' && selectedSubject !== 'ALL') {
       const paperSuffix =
-        selectedPaper !== 'ALL' && selectedPaper !== 'Single Paper'
+        selectedPaper !== 'ALL' &&
+        selectedPaper !== 'Single Paper' &&
+        selectedPaper !== 'Main Paper' &&
+        selectedPaper !== 'SSC' &&
+        selectedPaper !== 'HSC'
           ? ` ${selectedPaper}`
           : '';
       document.title = `${selectedSubject}${paperSuffix} — Web Books by Afeed`;
@@ -1350,6 +1435,7 @@ export default function App() {
   }, [
     viewMode,
     activePage,
+    activeSemiChapter,
     homeStage,
     activeExpandedChapter,
     selectedSubject,
@@ -1359,6 +1445,16 @@ export default function App() {
   // Step-by-step Back button handler for hierarchical navigation
   const handleHeaderBack = () => {
     if (viewMode === 'reader') {
+      if (activeSemiChapter) {
+        setSelectedClass(activeSemiChapter.chapter.className);
+        setSelectedSubject(activeSemiChapter.chapter.subject);
+        setSelectedPaper(activeSemiChapter.chapter.paper);
+        setSelectedChapter('ALL');
+        setActiveSemiChapter(null);
+        setHomeStage('chapters');
+        setViewMode('home');
+        return;
+      }
       setSelectedClass(activePage.className);
       setSelectedSubject(activePage.subject);
       setSelectedPaper(activePage.paper);
@@ -1455,9 +1551,10 @@ export default function App() {
 
         {/* Scrollable Navigation Items */}
         <div className="flex-1 overflow-y-auto px-3 py-2.5 space-y-1">
-          {/* All Notes Item (Returns to Stage 1: Subjects Home) */}
+          {/* Home Item (Shows All Subjects with Class + Quick Option to Find My Class) */}
           <button
             type="button"
+            data-testid="sidebar-home-btn"
             onClick={() => {
               setSearchQuery('');
               goToSubjectsStage('ALL');
@@ -1476,27 +1573,26 @@ export default function App() {
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="1.9"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="w-4 h-4 opacity-80"
               >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="8" y1="13" x2="16" y2="13" />
-                <line x1="8" y1="17" x2="13" y2="17" />
+                <path d="M3 10.5L12 3l9 7.5" />
+                <path d="M5 9.5V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9.5" />
               </svg>
-              <span>All notes</span>
+              <span>Home</span>
             </span>
             <span className="text-xs opacity-60 tabular-nums">
               {allPages.length}
             </span>
           </button>
 
-          {/* Student's My Class Shortcut (if student configured optional Class in Profile) */}
+          {/* Student's My Class Shortcut (Only shows their class's subjects!) */}
           {studentClass && (
             <button
               type="button"
+              data-testid="sidebar-my-class-btn"
               onClick={() => {
                 goToSubjectsStage(normalizeClassName(studentClass));
                 autoCloseSidebarOnMobile();
@@ -1707,23 +1803,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Corner Zone: Adaptive Form-Factor Badge + Viewing Area Collapse Toggle + Quick Topic Content Button (ONLY inside Reader content) + Search Button */}
+          {/* Right Corner Zone: Viewing Area Collapse Toggle + Quick Topic Content Button (ONLY inside uploaded Reader content) + Search Button */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Adaptive Form-Factor Indicator Badge (DeX / Foldable / Tablet / Phone) */}
-            <button
-              type="button"
-              onClick={() => {
-                setSettingsTab('display');
-                setSettingsOpen(true);
-              }}
-              data-testid="adaptive-form-factor-badge"
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] transition-colors"
-              title={`Adaptive Layout: ${deviceProfile.label} (${viewportSize.width}×${viewportSize.height})`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-              <span>{deviceProfile.label}</span>
-            </button>
-
             {/* Viewing Area Collapse / Expand Toggle Button (in Home Mode) */}
             {viewMode === 'home' && (
               <button
@@ -1762,7 +1843,7 @@ export default function App() {
               </button>
             )}
 
-            {viewMode === 'reader' && (
+            {viewMode === 'reader' && !activeSemiChapter && (
               <button
                 type="button"
                 onClick={() => {
@@ -2127,109 +2208,286 @@ export default function App() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-[var(--text-muted)] opacity-75 mt-1">
-                        {subjectPaperCards.length} Subjects — Select a subject
-                        to view its chapters
-                      </p>
                     </section>
 
-                    {/* INTERACTION AREA (24dp keyline margins + Adaptive Multi-Form-Factor Grid) */}
+                    {/* INTERACTION AREA (24dp keyline margins + 2 Clean Curriculum Sections) */}
                     <section
                       aria-label="Subject Folders Interaction Area"
-                      className="wb-interaction-area space-y-4"
+                      className="wb-interaction-area space-y-6"
                     >
-                      <div className="flex items-center justify-between px-1">
-                        <span className="text-xs font-semibold text-[var(--text-muted)]">
-                          Subjects &amp; Papers ({subjectPaperCards.length})
-                        </span>
-                        {selectedClass !== 'ALL' && (
-                          <button
-                            type="button"
-                            onClick={() => goToSubjectsStage('ALL')}
-                            className="text-xs font-semibold text-[var(--accent)] hover:underline"
-                          >
-                            Show Default Class
-                          </button>
-                        )}
-                      </div>
+                      {/* QUICKLY FIND MY CLASS BAR — Shown ONLY on the global "Home" page (selectedClass === 'ALL') */}
+                      {selectedClass === 'ALL' && (
+                        <div
+                          data-testid="quick-find-my-class-bar"
+                          className="wb-breadcrumb-pill flex flex-wrap items-center justify-between gap-3"
+                        >
+                          <span className="text-xs font-bold text-[var(--text-main)]">
+                            Home · All Classes
+                          </span>
 
-                      <div
-                        data-testid="home-subject-paper-grid"
-                        className={adaptiveHomeGridClass}
-                      >
-                        {subjectPaperCards.map((card: SubjectPaperCard) => {
-                          const accentPair = getThemeAwareAccentPair(
-                            card.color,
-                            theme
-                          );
-                          return (
-                            <button
-                              key={card.id}
-                              type="button"
-                              data-testid={`subject-card-${card.id}`}
-                              onClick={() =>
-                                goToChaptersStage(
-                                  card.className,
-                                  card.subject,
-                                  card.paper
-                                )
-                              }
-                              className="wb-focus-card group min-h-[138px] text-left flex flex-col justify-between"
-                            >
-                              {/* Top Row: Folder Container Icon + Unboxed Chapter & Note Metadata */}
-                              <div className="w-full flex items-start justify-between gap-3">
-                                <div
-                                  className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0"
-                                  style={{ backgroundColor: accentPair.bgSoft }}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {studentClass ? (
+                              <button
+                                type="button"
+                                data-testid="quick-open-my-class-btn"
+                                onClick={() =>
+                                  goToSubjectsStage(
+                                    normalizeClassName(studentClass)
+                                  )
+                                }
+                                className="px-3.5 py-1.5 rounded-xl btn-accent text-xs font-semibold whitespace-nowrap"
+                              >
+                                My Class ({normalizeClassName(studentClass)}) →
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  data-testid="quick-select-hsc"
+                                  onClick={() =>
+                                    handleQuickFindMyClass('Class 11-12 (HSC)')
+                                  }
+                                  className="px-3 py-1.5 rounded-xl btn-accent text-xs font-semibold whitespace-nowrap"
                                 >
-                                  <FolderIcon
-                                    color={accentPair.fg}
-                                    className="w-6 h-6"
-                                  />
-                                </div>
-                                <div className="text-right text-xs text-[var(--text-muted)] tabular-nums">
-                                  <span className="font-semibold text-[var(--text-main)]">
-                                    {card.chapterCount}{' '}
-                                    {card.chapterCount === 1
-                                      ? 'chapter'
-                                      : 'chapters'}
-                                  </span>
-                                  {card.count > 0 && (
-                                    <>
-                                      <span aria-hidden="true"> · </span>
-                                      <span className="text-[var(--accent)] font-semibold">
-                                        {card.count}{' '}
-                                        {card.count === 1 ? 'topic' : 'topics'}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
+                                  My Class: HSC (11–12)
+                                </button>
+                                <button
+                                  type="button"
+                                  data-testid="quick-select-ssc"
+                                  onClick={() =>
+                                    handleQuickFindMyClass('Class 9-10 (SSC)')
+                                  }
+                                  className="px-3 py-1.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] hover:border-[var(--accent)] text-xs font-semibold whitespace-nowrap"
+                                >
+                                  My Class: SSC (9–10)
+                                </button>
+                              </>
+                            )}
 
-                              {/* Bottom Row: Subject + Paper Name & Class */}
-                              <div className="pt-4 space-y-0.5 w-full">
-                                <div className="text-sm sm:text-base font-bold leading-snug truncate group-hover:text-[var(--accent)] transition-colors">
-                                  {card.displayName}
-                                </div>
-                                <div className="text-xs text-[var(--text-muted)] truncate flex items-center justify-between">
-                                  <span>{card.className}</span>
-                                  <span className="text-[var(--accent)] font-medium group-hover:translate-x-0.5 transition-transform">
-                                    Open Chapters →
-                                  </span>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                            <select
+                              aria-label="Quickly Find My Class"
+                              data-testid="quick-find-class-select"
+                              value={
+                                studentClass
+                                  ? normalizeClassName(studentClass)
+                                  : ''
+                              }
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleQuickFindMyClass(e.target.value);
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs font-medium text-[var(--text-main)]"
+                            >
+                              <option value="">Find My Class...</option>
+                              {ALL_CLASS_LEVELS.map((cls) => (
+                                <option key={cls} value={cls}>
+                                  {cls}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ===========================================================
+                          SECTION 1: GENERAL SUBJECTS
+                         =========================================================== */}
+                      {groupedSubjectSections.compulsory.length > 0 && (
+                        <div
+                          data-testid="section-compulsory-subjects"
+                          className="space-y-3"
+                        >
+                          <div className="flex items-center justify-between px-1">
+                            <h3 className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
+                              General Subjects
+                            </h3>
+                          </div>
+
+                          <div
+                            data-testid="home-compulsory-subject-grid"
+                            className={adaptiveHomeGridClass}
+                          >
+                            {groupedSubjectSections.compulsory.map(
+                              (card: SubjectPaperCard) => {
+                                const accentPair = getThemeAwareAccentPair(
+                                  card.color,
+                                  theme
+                                );
+                                return (
+                                  <button
+                                    key={card.id}
+                                    type="button"
+                                    data-testid={`subject-card-${card.id}`}
+                                    onClick={() =>
+                                      goToChaptersStage(
+                                        card.className,
+                                        card.subject,
+                                        card.paper
+                                      )
+                                    }
+                                    className="wb-focus-card group min-h-[126px] text-left flex flex-col justify-between"
+                                  >
+                                    {/* Top Row: Folder Icon + Chapter/Item Count */}
+                                    <div className="w-full flex items-start justify-between gap-2">
+                                      <div
+                                        className="w-11 h-11 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-105 shrink-0"
+                                        style={{
+                                          backgroundColor: accentPair.bgSoft,
+                                        }}
+                                      >
+                                        <FolderIcon
+                                          color={accentPair.fg}
+                                          className="w-5 h-5"
+                                        />
+                                      </div>
+                                      <div className="text-right text-xs text-[var(--text-muted)] tabular-nums">
+                                        <div className="font-semibold text-[var(--text-main)]">
+                                          {card.semiChapterCount
+                                            ? `${card.semiChapterCount} lessons`
+                                            : `${card.chapterCount} ${
+                                                card.chapterCount === 1
+                                                  ? 'unit'
+                                                  : 'chapters'
+                                              }`}
+                                        </div>
+                                        {card.count > 0 && (
+                                          <div className="text-[11px] text-[var(--accent)] font-semibold">
+                                            {card.count}{' '}
+                                            {card.count === 1
+                                              ? 'topic'
+                                              : 'topics'}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Bottom Row: Subject Name (English + Bangla) & Class when in ALL view */}
+                                    <div className="pt-3 space-y-0.5 w-full">
+                                      <div className="text-sm sm:text-base font-bold leading-snug truncate group-hover:text-[var(--accent)] transition-colors">
+                                        {card.displayName}
+                                      </div>
+                                      {card.banglaDisplayName && (
+                                        <div className="text-xs text-[var(--text-secondary)] truncate">
+                                          {card.banglaDisplayName}
+                                        </div>
+                                      )}
+                                      {selectedClass === 'ALL' && (
+                                        <div className="text-[11px] text-[var(--text-muted)] truncate pt-0.5">
+                                          {card.className}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ===========================================================
+                          SECTION 2: DIVISIONAL SUBJECTS
+                         =========================================================== */}
+                      {groupedSubjectSections.divisional.length > 0 && (
+                        <div
+                          data-testid="section-divisional-subjects"
+                          className="space-y-3 pt-2"
+                        >
+                          <div className="flex items-center justify-between px-1">
+                            <h3 className="text-xs sm:text-sm font-bold text-[var(--text-main)]">
+                              Divisional Subjects
+                            </h3>
+                          </div>
+
+                          <div
+                            data-testid="home-subject-paper-grid"
+                            className={adaptiveHomeGridClass}
+                          >
+                            {groupedSubjectSections.divisional.map(
+                              (card: SubjectPaperCard) => {
+                                const accentPair = getThemeAwareAccentPair(
+                                  card.color,
+                                  theme
+                                );
+                                return (
+                                  <button
+                                    key={card.id}
+                                    type="button"
+                                    data-testid={`subject-card-${card.id}`}
+                                    onClick={() =>
+                                      goToChaptersStage(
+                                        card.className,
+                                        card.subject,
+                                        card.paper
+                                      )
+                                    }
+                                    className="wb-focus-card group min-h-[126px] text-left flex flex-col justify-between"
+                                  >
+                                    {/* Top Row: Folder Icon + Chapter Count */}
+                                    <div className="w-full flex items-start justify-between gap-2">
+                                      <div
+                                        className="w-11 h-11 rounded-2xl flex items-center justify-center transition-transform duration-200 group-hover:scale-105 shrink-0"
+                                        style={{
+                                          backgroundColor: accentPair.bgSoft,
+                                        }}
+                                      >
+                                        <FolderIcon
+                                          color={accentPair.fg}
+                                          className="w-5 h-5"
+                                        />
+                                      </div>
+                                      <div className="text-right text-xs text-[var(--text-muted)] tabular-nums">
+                                        <div className="font-semibold text-[var(--text-main)]">
+                                          {card.chapterCount}{' '}
+                                          {card.chapterCount === 1
+                                            ? 'chapter'
+                                            : 'chapters'}
+                                        </div>
+                                        {card.count > 0 && (
+                                          <div className="text-[11px] text-[var(--accent)] font-semibold">
+                                            {card.count}{' '}
+                                            {card.count === 1
+                                              ? 'topic'
+                                              : 'topics'}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Bottom Row: Subject + Paper Name (English & Bangla) */}
+                                    <div className="pt-3 space-y-0.5 w-full">
+                                      <div className="text-sm sm:text-base font-bold leading-snug truncate group-hover:text-[var(--accent)] transition-colors">
+                                        {card.displayName}
+                                      </div>
+                                      {card.banglaDisplayName && (
+                                        <div className="text-xs text-[var(--text-secondary)] truncate">
+                                          {card.banglaDisplayName}
+                                        </div>
+                                      )}
+                                      {selectedClass === 'ALL' && (
+                                        <div className="text-[11px] text-[var(--text-muted)] truncate pt-0.5">
+                                          {card.className}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              }
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </section>
                   </div>
                 )}
 
                 {/* ===============================================================
-                    STAGE 2: CHAPTERS VIEW (homeStage === 'chapters')
-                    Opened after tapping a Subject (e.g., Chemistry 2nd Paper).
-                    Tapping a Chapter opens the Expanded Chapter Topics view!
+                    STAGE 2: CHAPTERS & SEMI-CHAPTERS VIEW (homeStage === 'chapters')
+                    Opened after tapping a Subject.
+                    - For subjects with semi-chapters (Bangla & English: Units, Prose, Poetry, Grammar, Composition),
+                      renders a direct clickable list of semi-chapters that immediately open the page!
+                    - For standard subjects, renders clean chapter cards.
                    =============================================================== */}
                 {homeStage === 'chapters' && (
                   <div
@@ -2256,16 +2514,17 @@ export default function App() {
                       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
                         {selectedSubject}{' '}
                         {selectedPaper !== 'ALL' &&
-                        selectedPaper !== 'Single Paper'
+                        selectedPaper !== 'Single Paper' &&
+                        selectedPaper !== 'Main Paper' &&
+                        selectedPaper !== 'SSC' &&
+                        selectedPaper !== 'HSC'
                           ? selectedPaper
                           : ''}
                       </h2>
-                      <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5">
+                      <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">
                         {effectiveHomeClassFilter === 'ALL'
                           ? 'Class 11-12 (HSC)'
-                          : effectiveHomeClassFilter}{' '}
-                        · {chaptersForSelectedSubject.length} Chapters — Tap a
-                        chapter to view its topics
+                          : effectiveHomeClassFilter}
                       </p>
                     </section>
 
@@ -2298,7 +2557,12 @@ export default function App() {
                             />
                             <span>
                               {selectedSubject}{' '}
-                              {selectedPaper !== 'ALL' ? selectedPaper : ''}
+                              {selectedPaper !== 'ALL' &&
+                              selectedPaper !== 'Main Paper' &&
+                              selectedPaper !== 'SSC' &&
+                              selectedPaper !== 'HSC'
+                                ? selectedPaper
+                                : ''}
                             </span>
                           </span>
                         </nav>
@@ -2312,78 +2576,203 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* Adaptive Card Grid Focus Block for Chapters */}
-                      <div
-                        data-testid="chapters-card-grid"
-                        className={adaptiveHomeGridClass}
-                      >
-                        {chaptersForSelectedSubject.map((chap) => {
-                          const hasReadyTopics = chap.pages.length > 0;
-                          const chapAccent = getThemeAwareAccentPair(
-                            chap.color,
-                            theme
-                          );
-                          return (
-                            <button
-                              key={chap.id}
-                              type="button"
-                              data-testid={`chapter-card-${chap.chapterNumber}`}
-                              onClick={() =>
-                                goToExpandedChapterStage(chap.chapterTitle)
-                              }
-                              className="wb-focus-card group min-h-[148px] text-left flex flex-col justify-between"
-                            >
-                              <div className="w-full flex items-start justify-between gap-3">
-                                <div
-                                  className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0"
-                                  style={{
-                                    backgroundColor: chapAccent.bgSoft,
-                                    color: chapAccent.fg,
-                                  }}
-                                >
-                                  Ch {chap.chapterNumber}
+                      {/* Show Under Construction Disclaimer ONLY when nothing is uploaded in this Subject yet */}
+                      {chaptersForSelectedSubject.every(
+                        (c) => c.pages.length === 0
+                      ) && (
+                        <div
+                          data-testid="subject-under-construction-disclaimer"
+                          className="caution-box flex flex-col sm:flex-row sm:items-center justify-between gap-3 !my-0"
+                        >
+                          <div className="space-y-0.5 text-xs">
+                            <div className="font-bold flex items-center gap-2">
+                              <span>🚧 Under Construction Disclaimer</span>
+                            </div>
+                            <p className="opacity-90 leading-relaxed">
+                              No notes have been uploaded for{' '}
+                              <strong>
+                                {selectedSubject}{' '}
+                                {selectedPaper !== 'ALL' &&
+                                selectedPaper !== 'Main Paper' &&
+                                selectedPaper !== 'SSC' &&
+                                selectedPaper !== 'HSC'
+                                  ? selectedPaper
+                                  : ''}
+                              </strong>{' '}
+                              yet.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedClass('Class 11-12 (HSC)');
+                              setSelectedSubject('Chemistry');
+                              setSelectedPaper('2nd Paper');
+                              goToExpandedChapterStage(
+                                '2nd Chapter: Organic Chemistry'
+                              );
+                            }}
+                            className="px-3.5 py-2 rounded-xl btn-accent text-xs whitespace-nowrap shrink-0 self-start sm:self-center"
+                          >
+                            Read Live Chapter →
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Check if this subject uses Semi-Chapters (Bangla & English: Prose, Poetry, Units, Grammar, Composition) */}
+                      {chaptersForSelectedSubject.some(
+                        (c) => c.semiChapters.length > 0
+                      ) ? (
+                        <div
+                          data-testid="chapters-card-grid"
+                          className="space-y-5"
+                        >
+                          {chaptersForSelectedSubject.map((chap) => {
+                            const chapAccent = getThemeAwareAccentPair(
+                              chap.color,
+                              theme
+                            );
+                            return (
+                              <div
+                                key={chap.id}
+                                data-testid={`chapter-card-${chap.chapterNumber}`}
+                                className="space-y-2.5"
+                              >
+                                <div className="px-1 flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span
+                                      className="px-2.5 py-1 rounded-xl text-xs font-bold shrink-0"
+                                      style={{
+                                        backgroundColor: chapAccent.bgSoft,
+                                        color: chapAccent.fg,
+                                      }}
+                                    >
+                                      {chap.chapterCode ||
+                                        `Unit ${chap.chapterNumber}`}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <h3 className="text-sm sm:text-base font-bold text-[var(--text-main)] truncate">
+                                        {chap.chapterTitle}
+                                      </h3>
+                                      {chap.banglaTitle && (
+                                        <p className="text-xs text-[var(--text-secondary)] truncate">
+                                          {chap.banglaTitle}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-xs font-semibold text-[var(--text-muted)] shrink-0 tabular-nums">
+                                    {chap.semiChapters.length}{' '}
+                                    {chap.semiChapters.length === 1
+                                      ? 'item'
+                                      : 'items'}
+                                  </span>
                                 </div>
-                                <div className="text-xs text-[var(--text-muted)] tabular-nums">
-                                  {hasReadyTopics ? (
-                                    <span className="font-semibold text-[var(--accent)]">
+
+                                {/* Direct Clickable List of Semi-Chapters (Prose, Poetry, Units, Lessons) */}
+                                <div
+                                  data-testid={`semi-chapter-list-${chap.chapterNumber}`}
+                                  className="wb-focus-block"
+                                >
+                                  {chap.semiChapters.map((semi) => (
+                                    <button
+                                      key={semi.id}
+                                      type="button"
+                                      data-testid={`semi-chapter-item-${semi.id}`}
+                                      onClick={() =>
+                                        handleOpenSemiChapter(chap, semi)
+                                      }
+                                      className="wb-list-row group"
+                                    >
+                                      <div className="flex items-center gap-3.5 min-w-0">
+                                        <span
+                                          className="px-2.5 py-1 rounded-xl text-[11px] font-bold shrink-0 tabular-nums"
+                                          style={{
+                                            backgroundColor: chapAccent.bgSoft,
+                                            color: chapAccent.fg,
+                                          }}
+                                        >
+                                          {semi.code}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <div className="text-xs sm:text-sm font-semibold truncate group-hover:text-[var(--accent)] transition-colors">
+                                            {semi.title}
+                                          </div>
+                                          {semi.banglaTitle && (
+                                            <div className="text-xs text-[var(--text-secondary)] truncate">
+                                              {semi.banglaTitle}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <span className="text-xs font-semibold text-[var(--accent)] shrink-0">
+                                        {semi.page ? 'Read →' : 'Open →'}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        /* Standard Chapter Cards Grid (Science, Math, Physics, Chemistry, Biology, ICT, BGS, Religion) */
+                        <div
+                          data-testid="chapters-card-grid"
+                          className={adaptiveHomeGridClass}
+                        >
+                          {chaptersForSelectedSubject.map((chap) => {
+                            const hasReadyTopics = chap.pages.length > 0;
+                            const chapAccent = getThemeAwareAccentPair(
+                              chap.color,
+                              theme
+                            );
+                            return (
+                              <button
+                                key={chap.id}
+                                type="button"
+                                data-testid={`chapter-card-${chap.chapterNumber}`}
+                                onClick={() =>
+                                  goToExpandedChapterStage(chap.chapterTitle)
+                                }
+                                className="wb-focus-card group min-h-[124px] text-left flex flex-col justify-between"
+                              >
+                                <div className="w-full flex items-start justify-between gap-2">
+                                  <div
+                                    className="px-2.5 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0"
+                                    style={{
+                                      backgroundColor: chapAccent.bgSoft,
+                                      color: chapAccent.fg,
+                                    }}
+                                  >
+                                    {chap.chapterCode ||
+                                      `Ch ${chap.chapterNumber}`}
+                                  </div>
+                                  {hasReadyTopics && (
+                                    <div className="text-xs text-[var(--accent)] font-semibold tabular-nums text-right shrink-0">
                                       {chap.pages.length}{' '}
                                       {chap.pages.length === 1
-                                        ? 'topic book'
-                                        : 'topic books'}{' '}
-                                      ·{' '}
-                                      {chap.pages.reduce(
-                                        (acc, p) => acc + p.mainTopics.length,
-                                        0
-                                      )}{' '}
-                                      sections
-                                    </span>
-                                  ) : (
-                                    <span>0 topics</span>
+                                        ? 'topic'
+                                        : 'topics'}
+                                    </div>
                                   )}
                                 </div>
-                              </div>
 
-                              <div className="pt-3.5 space-y-1 w-full">
-                                <div className="text-sm sm:text-base font-bold leading-snug group-hover:text-[var(--accent)] transition-colors">
-                                  {chap.chapterTitle}
+                                <div className="pt-3 space-y-1 w-full">
+                                  <div className="text-sm sm:text-base font-bold leading-snug group-hover:text-[var(--accent)] transition-colors">
+                                    {chap.chapterTitle}
+                                  </div>
+                                  {chap.banglaTitle && (
+                                    <div className="text-xs font-medium text-[var(--text-secondary)] line-clamp-1">
+                                      {chap.banglaTitle}
+                                    </div>
+                                  )}
                                 </div>
-                                <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed">
-                                  {chap.shortDescription}
-                                </p>
-                              </div>
-
-                              <div className="pt-3 mt-2 border-t border-[var(--border)] w-full flex items-center justify-between text-xs">
-                                <span className="text-[var(--text-muted)]">
-                                  {selectedSubject} {selectedPaper}
-                                </span>
-                                <span className="font-semibold text-[var(--accent)] group-hover:translate-x-0.5 transition-transform">
-                                  Open Chapter →
-                                </span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </section>
                   </div>
                 )}
@@ -2418,14 +2807,19 @@ export default function App() {
                       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight max-w-2xl">
                         {activeExpandedChapter.chapterTitle}
                       </h2>
-                      <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5 max-w-xl">
+                      {activeExpandedChapter.banglaTitle && (
+                        <p className="text-sm font-semibold text-[var(--text-secondary)] mt-1 max-w-2xl">
+                          {activeExpandedChapter.banglaTitle}
+                        </p>
+                      )}
+                      <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1 max-w-xl">
                         {activeExpandedChapter.subject}{' '}
-                        {activeExpandedChapter.paper} ·{' '}
-                        {activeExpandedChapter.className} —{' '}
-                        {activeExpandedChapter.pages.length}{' '}
-                        {activeExpandedChapter.pages.length === 1
-                          ? 'note'
-                          : 'notes'}
+                        {activeExpandedChapter.paper !== 'SSC' &&
+                        activeExpandedChapter.paper !== 'HSC' &&
+                        activeExpandedChapter.paper !== 'Main Paper'
+                          ? activeExpandedChapter.paper
+                          : ''}{' '}
+                        · {activeExpandedChapter.className}
                       </p>
                     </section>
 
@@ -2461,7 +2855,11 @@ export default function App() {
                             className="hover:text-[var(--accent)] font-medium transition-colors"
                           >
                             {activeExpandedChapter.subject}{' '}
-                            {activeExpandedChapter.paper}
+                            {activeExpandedChapter.paper !== 'SSC' &&
+                            activeExpandedChapter.paper !== 'HSC' &&
+                            activeExpandedChapter.paper !== 'Main Paper'
+                              ? activeExpandedChapter.paper
+                              : ''}
                           </button>
                           <span aria-hidden="true">›</span>
                           <span className="text-[var(--text-main)] font-semibold inline-flex items-center gap-1.5 truncate">
@@ -2495,15 +2893,81 @@ export default function App() {
                         </button>
                       </div>
 
-                      {activeExpandedChapter.pages.length === 0 ? (
-                        <div className="wb-focus-block p-10 text-center space-y-3">
-                          <div className="text-sm font-bold">
-                            No topic notes uploaded in this chapter yet
+                      {activeExpandedChapter.semiChapters.length > 0 ? (
+                        <div className="wb-focus-block">
+                          {activeExpandedChapter.semiChapters.map((semi) => {
+                            const chapAccent = getThemeAwareAccentPair(
+                              activeExpandedChapter.color,
+                              theme
+                            );
+                            return (
+                              <button
+                                key={semi.id}
+                                type="button"
+                                data-testid={`semi-chapter-item-${semi.id}`}
+                                onClick={() =>
+                                  handleOpenSemiChapter(
+                                    activeExpandedChapter,
+                                    semi
+                                  )
+                                }
+                                className="wb-list-row group"
+                              >
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                  <span
+                                    className="px-2.5 py-1 rounded-xl text-[11px] font-bold shrink-0 tabular-nums"
+                                    style={{
+                                      backgroundColor: chapAccent.bgSoft,
+                                      color: chapAccent.fg,
+                                    }}
+                                  >
+                                    {semi.code}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <div className="text-xs sm:text-sm font-semibold truncate group-hover:text-[var(--accent)] transition-colors">
+                                      {semi.title}
+                                    </div>
+                                    {semi.banglaTitle && (
+                                      <div className="text-xs text-[var(--text-secondary)] truncate">
+                                        {semi.banglaTitle}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="text-xs font-semibold text-[var(--accent)] shrink-0">
+                                  {semi.page ? 'Read →' : 'Open →'}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : activeExpandedChapter.pages.length === 0 ? (
+                        <div
+                          data-testid="chapter-under-construction-card"
+                          className="wb-focus-block p-8 sm:p-10 text-center space-y-4"
+                        >
+                          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold caution-box !my-0">
+                            <span>🚧 Under Construction Disclaimer</span>
                           </div>
-                          <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
-                            {activeExpandedChapter.shortDescription}. Switch to{' '}
-                            <strong>2nd Chapter: Organic Chemistry</strong> to
-                            read <strong>Alkane, Alkene &amp; Alkyne</strong>.
+                          <div className="space-y-1">
+                            <div className="text-base sm:text-lg font-bold">
+                              {activeExpandedChapter.chapterTitle}
+                            </div>
+                            {activeExpandedChapter.banglaTitle && (
+                              <div className="text-sm font-semibold text-[var(--text-secondary)]">
+                                {activeExpandedChapter.banglaTitle}
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-[var(--text-muted)] max-w-lg mx-auto leading-relaxed">
+                            No notes have been uploaded for this chapter yet.
+                            Switch to{' '}
+                            <strong>
+                              HSC Chemistry 2nd Paper → 2nd Chapter: Organic
+                              Chemistry
+                            </strong>{' '}
+                            to read the completed{' '}
+                            <strong>Alkane, Alkene &amp; Alkyne</strong> book.
                           </p>
                           <div className="pt-1 flex items-center justify-center gap-3 flex-wrap">
                             <button
@@ -2517,7 +2981,7 @@ export default function App() {
                               }
                               className="px-4 py-2 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs font-semibold hover:border-[var(--accent)]"
                             >
-                              Browse Other Chapters
+                              ← Browse Other Chapters
                             </button>
                             <button
                               type="button"
@@ -2531,7 +2995,7 @@ export default function App() {
                               }}
                               className="px-4 py-2 rounded-2xl btn-accent text-xs"
                             >
-                              Open 2nd Chapter: Organic Chemistry
+                              Open 2nd Chapter: Organic Chemistry →
                             </button>
                           </div>
                         </div>
@@ -2561,6 +3025,7 @@ export default function App() {
                                     type="button"
                                     data-testid={`topic-book-card-${page.id}`}
                                     onClick={() => {
+                                      setActiveSemiChapter(null);
                                       setActivePageId(page.id);
                                       setViewMode('reader');
                                       autoCloseSidebarOnMobile();
@@ -2587,7 +3052,7 @@ export default function App() {
                                       </span>
                                     </div>
 
-                                    {/* Clean Surface Body (White in Light Mode, #121215 in OLED Dark Mode) */}
+                                    {/* Clean Surface Body */}
                                     <div className="p-4 flex-1 flex flex-col justify-between space-y-3 w-full">
                                       <div className="space-y-1.5">
                                         <div className="text-xs text-[var(--text-muted)] truncate">
@@ -2596,9 +3061,6 @@ export default function App() {
                                         <div className="text-base sm:text-lg font-bold leading-snug text-[var(--text-main)] group-hover:text-[var(--accent)] transition-colors">
                                           {page.title}
                                         </div>
-                                        <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed">
-                                          {page.subtitle}
-                                        </p>
                                       </div>
 
                                       <div className="pt-3 border-t border-[var(--border)] w-full flex items-center justify-between text-xs">
@@ -2627,6 +3089,7 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    setActiveSemiChapter(null);
                                     setActivePageId(page.id);
                                     setViewMode('reader');
                                     autoCloseSidebarOnMobile();
@@ -2658,9 +3121,6 @@ export default function App() {
                                         <div className="text-xs sm:text-sm font-semibold truncate group-hover:text-[var(--accent)] transition-colors">
                                           {sec.title}
                                         </div>
-                                        <div className="text-[11px] text-[var(--text-muted)] truncate">
-                                          {page.title} · Section {idx + 1}
-                                        </div>
                                       </div>
                                     </div>
                                     <span className="text-xs font-semibold text-[var(--accent)] shrink-0">
@@ -2690,12 +3150,73 @@ export default function App() {
             data-testid="reader-main-container"
             className="flex-1 w-full max-w-none wb-interaction-area pt-4 view-transition-enter"
           >
-            {/* Render all <section class="topic-section"> blocks */}
-            <div
-              ref={readerContainerRef}
-              className="reader-container space-y-5"
-              dangerouslySetInnerHTML={{ __html: activePage.sectionsHtml }}
-            />
+            {activeSemiChapter ? (
+              <div
+                data-testid="semi-chapter-direct-reader"
+                className="reader-container space-y-5"
+              >
+                <section className="topic-section p-6 sm:p-8 space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] pb-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <span className="px-2.5 py-0.5 rounded-lg font-bold bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--accent)]">
+                          {activeSemiChapter.semi.code}
+                        </span>
+                        <span>
+                          {activeSemiChapter.chapter.className} ·{' '}
+                          {activeSemiChapter.chapter.subject}
+                          {activeSemiChapter.chapter.paper !== 'Main Paper' &&
+                          activeSemiChapter.chapter.paper !== 'SSC' &&
+                          activeSemiChapter.chapter.paper !== 'HSC'
+                            ? ` ${activeSemiChapter.chapter.paper}`
+                            : ''}
+                        </span>
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-main)]">
+                        {activeSemiChapter.semi.title}
+                      </h2>
+                      {activeSemiChapter.semi.banglaTitle && (
+                        <p className="text-sm sm:text-base font-semibold text-[var(--text-secondary)]">
+                          {activeSemiChapter.semi.banglaTitle}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleHeaderBack}
+                      className="px-3.5 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] hover:border-[var(--accent)] text-xs font-semibold"
+                    >
+                      ← Back to {activeSemiChapter.chapter.subject}
+                    </button>
+                  </div>
+
+                  <div
+                    data-testid="semi-chapter-under-construction-notice"
+                    className="caution-box space-y-2 !my-0"
+                  >
+                    <div className="font-bold text-xs sm:text-sm flex items-center gap-2">
+                      <span>🚧 Under Construction Disclaimer</span>
+                    </div>
+                    <p className="text-xs sm:text-sm opacity-90 leading-relaxed">
+                      This semi-chapter page (
+                      <strong>
+                        {activeSemiChapter.semi.banglaTitle ||
+                          activeSemiChapter.semi.title}
+                      </strong>
+                      ) opens directly and will contain all included topics and
+                      notes on this page once uploaded.
+                    </p>
+                  </div>
+                </section>
+              </div>
+            ) : (
+              /* Render all <section class="topic-section"> blocks */
+              <div
+                ref={readerContainerRef}
+                className="reader-container space-y-5"
+                dangerouslySetInnerHTML={{ __html: activePage.sectionsHtml }}
+              />
+            )}
           </main>
         )}
       </div>

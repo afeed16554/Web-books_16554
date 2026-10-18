@@ -2,7 +2,17 @@ import {
   MAIN_NAVIGATION_TOPICS,
   getAllSectionsHtml,
 } from './chemistrySections.ts';
-import type { TopicItem } from './chemistrySections.ts';
+import {
+  CURRICULUM_CHAPTERS,
+  makeChapters,
+} from './nctbCurriculumData.ts';
+import type {
+  SeedChapterEntry,
+  SeedSemiChapterEntry,
+} from './nctbCurriculumData.ts';
+
+export { CURRICULUM_CHAPTERS, makeChapters };
+export type { SeedChapterEntry, SeedSemiChapterEntry };
 
 export const ALL_CLASS_LEVELS: string[] = [
   'Class 1',
@@ -44,28 +54,50 @@ export interface FolderNode {
   pages: LibraryTopicPage[];
 }
 
+export type SubjectCategory = 'compulsory' | 'divisional';
+
 export interface SubjectPaperCard {
   id: string;
   className: string;
   subject: string;
   paper: string;
-  displayName: string; // e.g., "Chemistry 2nd Paper"
+  displayName: string;
+  banglaDisplayName?: string;
+  subjectCode?: string;
+  category: SubjectCategory;
   color: string;
   chapterCount: number;
+  semiChapterCount?: number;
   count: number;
   pages: LibraryTopicPage[];
+}
+
+export interface SemiChapterItem {
+  id: string;
+  code: string;
+  title: string;
+  banglaTitle?: string;
+  chapterTitle: string;
+  className: string;
+  subject: string;
+  paper: string;
+  page?: LibraryTopicPage;
 }
 
 export interface ChapterItem {
   id: string;
   chapterNumber: number;
+  chapterCode?: string;
+  subjectCode?: string;
   className: string;
   subject: string;
   paper: string;
-  chapterTitle: string; // e.g., "2nd Chapter: Organic Chemistry"
+  chapterTitle: string;
+  banglaTitle?: string;
   shortDescription: string;
   color: string;
   pages: LibraryTopicPage[];
+  semiChapters: SemiChapterItem[];
 }
 
 export function normalizeClassName(rawClass: string): string {
@@ -137,186 +169,6 @@ export const BUILT_IN_PAGES: LibraryTopicPage[] = [
 ];
 
 /**
- * Curriculum chapters catalog so tapping a Subject + Paper opens its Chapters view first.
- */
-export const CURRICULUM_CHAPTERS: Record<
-  string,
-  Array<{ chapterTitle: string; shortDescription: string; color: string }>
-> = {
-  'Class 11-12 (HSC)::Chemistry::2nd Paper': [
-    {
-      chapterTitle: '1st Chapter: Environmental Chemistry',
-      shortDescription: 'Gas laws, acid rain, water purity & atmospheric chemistry',
-      color: '#10b981',
-    },
-    {
-      chapterTitle: '2nd Chapter: Organic Chemistry',
-      shortDescription:
-        'Hydrocarbons (Alkane, Alkene, Alkyne), reaction mechanisms, ozonolysis & functional groups',
-      color: '#38bdf8',
-    },
-    {
-      chapterTitle: '3rd Chapter: Quantitative Chemistry',
-      shortDescription: 'Stoichiometry, molarity, titration & redox calculations',
-      color: '#f59e0b',
-    },
-    {
-      chapterTitle: '4th Chapter: Electrochemistry',
-      shortDescription: 'Electrolytic conductance, Faraday laws, Nernst equation & cells',
-      color: '#a855f7',
-    },
-    {
-      chapterTitle: '5th Chapter: Economic Chemistry',
-      shortDescription: 'Industrial chemistry, glass, ceramics, pulp, paper & nanoceramics',
-      color: '#ec4899',
-    },
-  ],
-  'Class 11-12 (HSC)::Chemistry::1st Paper': [
-    {
-      chapterTitle: '1st Chapter: Safe Use of Laboratory',
-      shortDescription: 'Apparatus safety, reagent handling & analytical balance',
-      color: '#10b981',
-    },
-    {
-      chapterTitle: '2nd Chapter: Qualitative Chemistry',
-      shortDescription: 'Atomic models, quantum numbers, spectra & solubility product',
-      color: '#38bdf8',
-    },
-    {
-      chapterTitle: '3rd Chapter: Periodic Properties & Chemical Bonding',
-      shortDescription: 'Hybridization, VSEPR, Fajan rules & periodic trends',
-      color: '#f59e0b',
-    },
-    {
-      chapterTitle: '4th Chapter: Chemical Changes',
-      shortDescription: 'Chemical kinetics, equilibrium, Le Chatelier, pH & buffers',
-      color: '#a855f7',
-    },
-    {
-      chapterTitle: '5th Chapter: Vocational Chemistry',
-      shortDescription: 'Food safety, preservatives, vinegar & household suspension',
-      color: '#ec4899',
-    },
-  ],
-  'Class 11-12 (HSC)::Physics::1st Paper': [
-    {
-      chapterTitle: '1st Chapter: Physical World & Measurement',
-      shortDescription: 'Dimensions, significant figures & error analysis',
-      color: '#f59e0b',
-    },
-    {
-      chapterTitle: '2nd Chapter: Vector',
-      shortDescription: 'Vector calculus, dot/cross products, river-boat & rain problems',
-      color: '#38bdf8',
-    },
-    {
-      chapterTitle: '3rd Chapter: Dynamics',
-      shortDescription: 'Projectile motion, circular motion & equations of kinematics',
-      color: '#10b981',
-    },
-    {
-      chapterTitle: '4th Chapter: Newtonian Mechanics',
-      shortDescription: 'Conservation of momentum, moment of inertia & banking of roads',
-      color: '#a855f7',
-    },
-    {
-      chapterTitle: '5th Chapter: Work, Energy & Power',
-      shortDescription: 'Work-energy theorem, spring potential & efficiency',
-      color: '#ec4899',
-    },
-  ],
-  'Class 11-12 (HSC)::Physics::2nd Paper': [
-    {
-      chapterTitle: '1st Chapter: Thermodynamics',
-      shortDescription: 'First & second laws, Carnot cycle & entropy',
-      color: '#a855f7',
-    },
-    {
-      chapterTitle: '2nd Chapter: Static Electricity',
-      shortDescription: 'Coulomb law, electric field, Gauss law & capacitors',
-      color: '#38bdf8',
-    },
-    {
-      chapterTitle: '3rd Chapter: Current Electricity',
-      shortDescription: 'Kirchhoff laws, Wheatstone bridge, meter bridge & potentiometer',
-      color: '#10b981',
-    },
-  ],
-  'Class 11-12 (HSC)::Higher Math::1st Paper': [
-    {
-      chapterTitle: '1st Chapter: Matrices & Determinants',
-      shortDescription: 'Matrix inversion, system of equations & determinant properties',
-      color: '#84cc16',
-    },
-    {
-      chapterTitle: '3rd Chapter: Straight Lines',
-      shortDescription: 'Cartesian & polar coordinates, locus, slope & angle bisectors',
-      color: '#38bdf8',
-    },
-    {
-      chapterTitle: '9th Chapter: Differentiation',
-      shortDescription: 'Limits, continuity, successive derivatives & extrema',
-      color: '#f59e0b',
-    },
-  ],
-  'Class 11-12 (HSC)::Higher Math::2nd Paper': [
-    {
-      chapterTitle: '1st Chapter: Real Numbers & Inequalities',
-      shortDescription: 'Absolute value inequalities & order properties',
-      color: '#f97316',
-    },
-    {
-      chapterTitle: '3rd Chapter: Complex Numbers',
-      shortDescription: 'Argand diagram, modulus-argument, cube roots of unity',
-      color: '#38bdf8',
-    },
-    {
-      chapterTitle: '6th Chapter: Conics',
-      shortDescription: 'Parabola, ellipse & hyperbola standard forms',
-      color: '#a855f7',
-    },
-  ],
-  'Class 11-12 (HSC)::Biology::1st Paper': [
-    {
-      chapterTitle: '1st Chapter: Cell & Its Structure',
-      shortDescription: 'Organelles, plasma membrane, chromosomes & DNA/RNA',
-      color: '#ec4899',
-    },
-    {
-      chapterTitle: '2nd Chapter: Cell Division',
-      shortDescription: 'Mitosis, meiosis, crossing over & cell cycle checkpoints',
-      color: '#10b981',
-    },
-  ],
-  'Class 11-12 (HSC)::Biology::2nd Paper': [
-    {
-      chapterTitle: '1st Chapter: Animal Diversity & Classification',
-      shortDescription: 'Symmetry, coelom, chordate & non-chordate phyla',
-      color: '#8b5cf6',
-    },
-    {
-      chapterTitle: '2nd Chapter: Introduction to Animals',
-      shortDescription: 'Hydra, grasshopper & Ruho fish anatomy and physiology',
-      color: '#38bdf8',
-    },
-  ],
-  'Class 9-10 (SSC)::Chemistry::SSC': [
-    {
-      chapterTitle: '11th Chapter: Mineral Resources — Fossils',
-      shortDescription: 'Hydrocarbons, alkanes, alkenes, alkynes & polymers',
-      color: '#10b981',
-    },
-  ],
-  'Class 9-10 (SSC)::Physics::SSC': [
-    {
-      chapterTitle: '2nd Chapter: Motion',
-      shortDescription: 'Equations of motion, acceleration & falling bodies',
-      color: '#f59e0b',
-    },
-  ],
-};
-
-/**
  * Extracts <section class="topic-section" id="..."> and first <h2> title from raw HTML
  * so newly uploaded/pasted pages automatically populate the Quick Topic picker.
  */
@@ -355,6 +207,589 @@ const CLASS_COLORS: Record<string, string> = {
   'Class 11-12 (HSC)': '#f43f5e',
 };
 
+function makeClass6To8Subjects(
+  className: string,
+  banglaBookName: string
+): Omit<SubjectPaperCard, 'count' | 'pages' | 'chapterCount'>[] {
+  const slug = className.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return [
+    {
+      id: `${slug}-bangla-1st`,
+      className,
+      subject: 'Bangla',
+      paper: '1st Paper',
+      displayName: 'Bangla 1st Paper',
+      banglaDisplayName: `বাংলা ১ম পত্র (${banglaBookName})`,
+      subjectCode: '101',
+      category: 'compulsory',
+      color: '#f97316',
+    },
+    {
+      id: `${slug}-bangla-2nd`,
+      className,
+      subject: 'Bangla',
+      paper: '2nd Paper',
+      displayName: 'Bangla 2nd Paper',
+      banglaDisplayName: 'বাংলা ব্যাকরণ ও নির্মিতি',
+      subjectCode: '102',
+      category: 'compulsory',
+      color: '#f59e0b',
+    },
+    {
+      id: `${slug}-english-1st`,
+      className,
+      subject: 'English',
+      paper: '1st Paper',
+      displayName: 'English 1st Paper',
+      banglaDisplayName: 'ইংরেজি ১ম পত্র (English for Today)',
+      subjectCode: '107',
+      category: 'compulsory',
+      color: '#38bdf8',
+    },
+    {
+      id: `${slug}-english-2nd`,
+      className,
+      subject: 'English',
+      paper: '2nd Paper',
+      displayName: 'English 2nd Paper',
+      banglaDisplayName: 'ইংরেজি ২য় পত্র (Grammar & Composition)',
+      subjectCode: '108',
+      category: 'compulsory',
+      color: '#8b5cf6',
+    },
+    {
+      id: `${slug}-math`,
+      className,
+      subject: 'General Math',
+      paper: 'Main Paper',
+      displayName: 'General Math',
+      banglaDisplayName: 'গণিত',
+      subjectCode: '109',
+      category: 'compulsory',
+      color: '#84cc16',
+    },
+    {
+      id: `${slug}-ict`,
+      className,
+      subject: 'ICT',
+      paper: 'Main Paper',
+      displayName: 'ICT',
+      banglaDisplayName: 'তথ্য ও যোগাযোগ প্রযুক্তি',
+      subjectCode: '154',
+      category: 'compulsory',
+      color: '#10b981',
+    },
+    {
+      id: `${slug}-bgs`,
+      className,
+      subject: 'Bangladesh and Global Studies',
+      paper: 'Main Paper',
+      displayName: 'Bangladesh and Global Studies',
+      banglaDisplayName: 'বাংলাদেশ ও বিশ্বপরিচয়',
+      subjectCode: '150',
+      category: 'compulsory',
+      color: '#ec4899',
+    },
+    {
+      id: `${slug}-religion`,
+      className,
+      subject: 'Religion',
+      paper: 'Main Paper',
+      displayName: 'Religion & Moral Education',
+      banglaDisplayName: 'ধর্ম ও নৈতিক শিক্ষা',
+      subjectCode: '111',
+      category: 'compulsory',
+      color: '#a855f7',
+    },
+    {
+      id: `${slug}-science`,
+      className,
+      subject: 'General Science',
+      paper: 'Main Paper',
+      displayName: 'General Science',
+      banglaDisplayName: 'বিজ্ঞান',
+      subjectCode: '127',
+      category: 'divisional',
+      color: '#38bdf8',
+    },
+  ];
+}
+
+function makeClass3To5Subjects(
+  className: string
+): Omit<SubjectPaperCard, 'count' | 'pages' | 'chapterCount'>[] {
+  const slug = className.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return [
+    {
+      id: `${slug}-bangla`,
+      className,
+      subject: 'Bangla',
+      paper: 'Main Paper',
+      displayName: 'Bangla',
+      banglaDisplayName: 'আমার বাংলা বই',
+      subjectCode: '101',
+      category: 'compulsory',
+      color: '#f97316',
+    },
+    {
+      id: `${slug}-english`,
+      className,
+      subject: 'English',
+      paper: 'Main Paper',
+      displayName: 'English',
+      banglaDisplayName: 'English for Today',
+      subjectCode: '107',
+      category: 'compulsory',
+      color: '#38bdf8',
+    },
+    {
+      id: `${slug}-math`,
+      className,
+      subject: 'General Math',
+      paper: 'Main Paper',
+      displayName: 'Elementary Mathematics',
+      banglaDisplayName: 'প্রাথমিক গণিত',
+      subjectCode: '109',
+      category: 'compulsory',
+      color: '#84cc16',
+    },
+    {
+      id: `${slug}-bgs`,
+      className,
+      subject: 'Bangladesh and Global Studies',
+      paper: 'Main Paper',
+      displayName: 'Bangladesh and Global Studies',
+      banglaDisplayName: 'বাংলাদেশ ও বিশ্বপরিচয়',
+      subjectCode: '150',
+      category: 'compulsory',
+      color: '#ec4899',
+    },
+    {
+      id: `${slug}-religion`,
+      className,
+      subject: 'Religion',
+      paper: 'Main Paper',
+      displayName: 'Religion & Moral Education',
+      banglaDisplayName: 'ধর্ম ও নৈতিক শিক্ষা',
+      subjectCode: '111',
+      category: 'compulsory',
+      color: '#a855f7',
+    },
+    {
+      id: `${slug}-science`,
+      className,
+      subject: 'General Science',
+      paper: 'Main Paper',
+      displayName: 'Elementary Science',
+      banglaDisplayName: 'প্রাথমিক বিজ্ঞান',
+      subjectCode: '127',
+      category: 'divisional',
+      color: '#10b981',
+    },
+  ];
+}
+
+function makeClass1To2Subjects(
+  className: string
+): Omit<SubjectPaperCard, 'count' | 'pages' | 'chapterCount'>[] {
+  const slug = className.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return [
+    {
+      id: `${slug}-bangla`,
+      className,
+      subject: 'Bangla',
+      paper: 'Main Paper',
+      displayName: 'Bangla',
+      banglaDisplayName: 'আমার বাংলা বই',
+      subjectCode: '101',
+      category: 'compulsory',
+      color: '#f97316',
+    },
+    {
+      id: `${slug}-english`,
+      className,
+      subject: 'English',
+      paper: 'Main Paper',
+      displayName: 'English',
+      banglaDisplayName: 'English for Today',
+      subjectCode: '107',
+      category: 'compulsory',
+      color: '#38bdf8',
+    },
+    {
+      id: `${slug}-math`,
+      className,
+      subject: 'General Math',
+      paper: 'Main Paper',
+      displayName: 'Elementary Mathematics',
+      banglaDisplayName: 'প্রাথমিক গণিত',
+      subjectCode: '109',
+      category: 'compulsory',
+      color: '#84cc16',
+    },
+  ];
+}
+
+/**
+ * Master ordered preset of Compulsory and Divisional Subject + Paper cards
+ * across HSC (Class 11–12), SSC (Class 9–10), and Classes 1 to 8.
+ */
+export const DEFAULT_SUBJECT_PAPERS: Omit<
+  SubjectPaperCard,
+  'count' | 'pages' | 'chapterCount'
+>[] = [
+  // =========================================================================
+  // HSC (CLASS 11–12) — COMPULSORY SUBJECTS
+  // =========================================================================
+  {
+    id: 'hsc-bangla-1st',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Bangla',
+    paper: '1st Paper',
+    displayName: 'Bangla 1st Paper',
+    banglaDisplayName: 'বাংলা ১ম পত্র',
+    subjectCode: '101',
+    category: 'compulsory',
+    color: '#f97316',
+  },
+  {
+    id: 'hsc-bangla-2nd',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Bangla',
+    paper: '2nd Paper',
+    displayName: 'Bangla 2nd Paper',
+    banglaDisplayName: 'বাংলা ২য় পত্র',
+    subjectCode: '102',
+    category: 'compulsory',
+    color: '#f59e0b',
+  },
+  {
+    id: 'hsc-english-1st',
+    className: 'Class 11-12 (HSC)',
+    subject: 'English',
+    paper: '1st Paper',
+    displayName: 'English 1st Paper',
+    banglaDisplayName: 'ইংরেজি ১ম পত্র',
+    subjectCode: '107',
+    category: 'compulsory',
+    color: '#38bdf8',
+  },
+  {
+    id: 'hsc-english-2nd',
+    className: 'Class 11-12 (HSC)',
+    subject: 'English',
+    paper: '2nd Paper',
+    displayName: 'English 2nd Paper',
+    banglaDisplayName: 'ইংরেজি ২য় পত্র',
+    subjectCode: '108',
+    category: 'compulsory',
+    color: '#8b5cf6',
+  },
+  {
+    id: 'hsc-ict',
+    className: 'Class 11-12 (HSC)',
+    subject: 'ICT',
+    paper: 'HSC',
+    displayName: 'ICT',
+    banglaDisplayName: 'তথ্য ও যোগাযোগ প্রযুক্তি',
+    subjectCode: '275',
+    category: 'compulsory',
+    color: '#10b981',
+  },
+
+  // =========================================================================
+  // HSC (CLASS 11–12) — DIVISIONAL SUBJECTS
+  // =========================================================================
+  {
+    id: 'hsc-physics-1st',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Physics',
+    paper: '1st Paper',
+    displayName: 'Physics 1st Paper',
+    banglaDisplayName: 'পদার্থবিজ্ঞান ১ম পত্র',
+    subjectCode: '174',
+    category: 'divisional',
+    color: '#f59e0b',
+  },
+  {
+    id: 'hsc-physics-2nd',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Physics',
+    paper: '2nd Paper',
+    displayName: 'Physics 2nd Paper',
+    banglaDisplayName: 'পদার্থবিজ্ঞান ২য় পত্র',
+    subjectCode: '175',
+    category: 'divisional',
+    color: '#a855f7',
+  },
+  {
+    id: 'hsc-chemistry-1st',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Chemistry',
+    paper: '1st Paper',
+    displayName: 'Chemistry 1st Paper',
+    banglaDisplayName: 'রসায়ন ১ম পত্র',
+    subjectCode: '176',
+    category: 'divisional',
+    color: '#10b981',
+  },
+  {
+    id: 'hsc-chemistry-2nd',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Chemistry',
+    paper: '2nd Paper',
+    displayName: 'Chemistry 2nd Paper',
+    banglaDisplayName: 'রসায়ন ২য় পত্র',
+    subjectCode: '177',
+    category: 'divisional',
+    color: '#38bdf8',
+  },
+  {
+    id: 'hsc-math-1st',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Higher Math',
+    paper: '1st Paper',
+    displayName: 'Higher Math 1st Paper',
+    banglaDisplayName: 'উচ্চতর গণিত ১ম পত্র',
+    subjectCode: '265',
+    category: 'divisional',
+    color: '#84cc16',
+  },
+  {
+    id: 'hsc-math-2nd',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Higher Math',
+    paper: '2nd Paper',
+    displayName: 'Higher Math 2nd Paper',
+    banglaDisplayName: 'উচ্চতর গণিত ২য় পত্র',
+    subjectCode: '266',
+    category: 'divisional',
+    color: '#f97316',
+  },
+  {
+    id: 'hsc-bio-1st',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Biology',
+    paper: '1st Paper',
+    displayName: 'Biology 1st Paper',
+    banglaDisplayName: 'জীববিজ্ঞান ১ম পত্র',
+    subjectCode: '178',
+    category: 'divisional',
+    color: '#ec4899',
+  },
+  {
+    id: 'hsc-bio-2nd',
+    className: 'Class 11-12 (HSC)',
+    subject: 'Biology',
+    paper: '2nd Paper',
+    displayName: 'Biology 2nd Paper',
+    banglaDisplayName: 'জীববিজ্ঞান ২য় পত্র',
+    subjectCode: '179',
+    category: 'divisional',
+    color: '#8b5cf6',
+  },
+
+  // =========================================================================
+  // SSC (CLASS 9–10) — COMPULSORY SUBJECTS
+  // =========================================================================
+  {
+    id: 'ssc-bangla-1st',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Bangla',
+    paper: '1st Paper',
+    displayName: 'Bangla 1st Paper',
+    banglaDisplayName: 'বাংলা ১ম পত্র',
+    subjectCode: '101',
+    category: 'compulsory',
+    color: '#f97316',
+  },
+  {
+    id: 'ssc-bangla-2nd',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Bangla',
+    paper: '2nd Paper',
+    displayName: 'Bangla 2nd Paper',
+    banglaDisplayName: 'বাংলা ২য় পত্র',
+    subjectCode: '102',
+    category: 'compulsory',
+    color: '#f59e0b',
+  },
+  {
+    id: 'ssc-english-1st',
+    className: 'Class 9-10 (SSC)',
+    subject: 'English',
+    paper: '1st Paper',
+    displayName: 'English 1st Paper',
+    banglaDisplayName: 'ইংরেজি ১ম পত্র',
+    subjectCode: '107',
+    category: 'compulsory',
+    color: '#38bdf8',
+  },
+  {
+    id: 'ssc-english-2nd',
+    className: 'Class 9-10 (SSC)',
+    subject: 'English',
+    paper: '2nd Paper',
+    displayName: 'English 2nd Paper',
+    banglaDisplayName: 'ইংরেজি ২য় পত্র',
+    subjectCode: '108',
+    category: 'compulsory',
+    color: '#8b5cf6',
+  },
+  {
+    id: 'ssc-general-math',
+    className: 'Class 9-10 (SSC)',
+    subject: 'General Math',
+    paper: 'SSC',
+    displayName: 'General Math',
+    banglaDisplayName: 'গণিত',
+    subjectCode: '109',
+    category: 'compulsory',
+    color: '#84cc16',
+  },
+  {
+    id: 'ssc-ict',
+    className: 'Class 9-10 (SSC)',
+    subject: 'ICT',
+    paper: 'SSC',
+    displayName: 'ICT',
+    banglaDisplayName: 'তথ্য ও যোগাযোগ প্রযুক্তি',
+    subjectCode: '154',
+    category: 'compulsory',
+    color: '#10b981',
+  },
+  {
+    id: 'ssc-bgs',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Bangladesh and Global Studies',
+    paper: 'SSC',
+    displayName: 'Bangladesh and Global Studies',
+    banglaDisplayName: 'বাংলাদেশ ও বিশ্বপরিচয়',
+    subjectCode: '150',
+    category: 'compulsory',
+    color: '#ec4899',
+  },
+  {
+    id: 'ssc-religion-islam',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Religion',
+    paper: 'Islam & Moral Education',
+    displayName: 'Islam & Moral Education',
+    banglaDisplayName: 'ইসলাম ও নৈতিক শিক্ষা',
+    subjectCode: '111',
+    category: 'compulsory',
+    color: '#a855f7',
+  },
+  {
+    id: 'ssc-religion-hindu',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Religion',
+    paper: 'Hindu Religion & Moral Education',
+    displayName: 'Hindu Religion & Moral Education',
+    banglaDisplayName: 'হিন্দুধর্ম ও নৈতিক শিক্ষা',
+    subjectCode: '112',
+    category: 'compulsory',
+    color: '#f59e0b',
+  },
+  {
+    id: 'ssc-religion-christian',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Religion',
+    paper: 'Christian Religion & Moral Education',
+    displayName: 'Christian Religion & Moral Education',
+    banglaDisplayName: 'খ্রিষ্টধর্ম ও নৈতিক শিক্ষা',
+    subjectCode: '113',
+    category: 'compulsory',
+    color: '#38bdf8',
+  },
+  {
+    id: 'ssc-religion-buddhist',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Religion',
+    paper: 'Buddhist Religion & Moral Education',
+    displayName: 'Buddhist Religion & Moral Education',
+    banglaDisplayName: 'বৌদ্ধধর্ম ও নৈতিক শিক্ষা',
+    subjectCode: '114',
+    category: 'compulsory',
+    color: '#10b981',
+  },
+
+  // =========================================================================
+  // SSC (CLASS 9–10) — DIVISIONAL SUBJECTS
+  // =========================================================================
+  {
+    id: 'ssc-physics',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Physics',
+    paper: 'SSC',
+    displayName: 'Physics',
+    banglaDisplayName: 'পদার্থবিজ্ঞান',
+    subjectCode: '136',
+    category: 'divisional',
+    color: '#f59e0b',
+  },
+  {
+    id: 'ssc-chemistry',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Chemistry',
+    paper: 'SSC',
+    displayName: 'Chemistry',
+    banglaDisplayName: 'রসায়ন',
+    subjectCode: '137',
+    category: 'divisional',
+    color: '#10b981',
+  },
+  {
+    id: 'ssc-higher-math',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Higher Math',
+    paper: 'SSC',
+    displayName: 'Higher Math',
+    banglaDisplayName: 'উচ্চতর গণিত',
+    subjectCode: '126',
+    category: 'divisional',
+    color: '#84cc16',
+  },
+  {
+    id: 'ssc-biology',
+    className: 'Class 9-10 (SSC)',
+    subject: 'Biology',
+    paper: 'SSC',
+    displayName: 'Biology',
+    banglaDisplayName: 'জীববিজ্ঞান',
+    subjectCode: '138',
+    category: 'divisional',
+    color: '#ec4899',
+  },
+
+  // =========================================================================
+  // CLASS 8, 7, 6 (JUNIOR SECONDARY) & CLASS 5, 4, 3, 2, 1 (PRIMARY)
+  // =========================================================================
+  ...makeClass6To8Subjects('Class 8', 'সাহিত্য কণিকা'),
+  ...makeClass6To8Subjects('Class 7', 'সপ্তবর্ণা'),
+  ...makeClass6To8Subjects('Class 6', 'চারুপাঠ'),
+  ...makeClass3To5Subjects('Class 5'),
+  ...makeClass3To5Subjects('Class 4'),
+  ...makeClass3To5Subjects('Class 3'),
+  ...makeClass1To2Subjects('Class 2'),
+  ...makeClass1To2Subjects('Class 1'),
+];
+
+/**
+ * Splits a list of SubjectPaperCards into the 2 ordered curriculum sections:
+ * 1. General / Compulsory Subjects
+ * 2. Divisional / Science Subjects
+ */
+export function splitSubjectsByCategory(cards: SubjectPaperCard[]): {
+  compulsory: SubjectPaperCard[];
+  divisional: SubjectPaperCard[];
+} {
+  return {
+    compulsory: cards.filter((c) => c.category === 'compulsory'),
+    divisional: cards.filter((c) => c.category === 'divisional'),
+  };
+}
+
 /**
  * Organizes all pages into a hierarchical Class -> Subject -> Paper -> Chapter tree
  * with all classes from Class 1 to 8, Class 9-10 (SSC), and Class 11-12 (HSC) present in the Sidebar.
@@ -387,7 +822,6 @@ export function buildFolderHierarchy(
 
   const rootList: FolderNode[] = [];
 
-  // 1. Seed all classes from Class 1 to 8, Class 9-10 (SSC), Class 11-12 (HSC)
   for (const cls of ALL_CLASS_LEVELS) {
     const slug = cls.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     ensureNode(
@@ -399,148 +833,64 @@ export function buildFolderHierarchy(
     );
   }
 
-  // 2. Seed SSC (Class 9-10) core science subjects
-  const sscNode = ensureNode(
-    rootList,
-    'class-9-10-ssc',
-    'Class 9-10 (SSC)',
-    'class',
-    CLASS_COLORS['Class 9-10 (SSC)']
-  );
-  ensureNode(sscNode.children, 'ssc-chem', 'Chemistry', 'subject', '#10b981');
-  ensureNode(sscNode.children, 'ssc-phys', 'Physics', 'subject', '#f59e0b');
-  ensureNode(sscNode.children, 'ssc-bio', 'Biology', 'subject', '#a855f7');
-  ensureNode(sscNode.children, 'ssc-math', 'Higher Math', 'subject', '#3b82f6');
-
-  // 3. Seed HSC (Class 11-12) subjects & papers
-  const hscNode = ensureNode(
-    rootList,
-    'class-11-12-hsc',
-    'Class 11-12 (HSC)',
-    'class',
-    CLASS_COLORS['Class 11-12 (HSC)']
-  );
-  const chemNode = ensureNode(
-    hscNode.children,
-    'class-11-12-chem',
-    'Chemistry',
-    'subject',
-    '#3b82f6'
-  );
-  ensureNode(
-    chemNode.children,
-    'class-11-12-chem-1st',
-    '1st Paper',
-    'paper',
-    '#10b981'
-  );
-  const chem2ndNode = ensureNode(
-    chemNode.children,
-    'class-11-12-chem-2nd',
-    '2nd Paper',
-    'paper',
-    '#38bdf8'
-  );
-  ensureNode(
-    chem2ndNode.children,
-    'class-11-12-chem-2nd-ch2',
-    '2nd Chapter: Organic Chemistry',
-    'chapter',
-    '#f59e0b'
-  );
-
-  const physNode = ensureNode(
-    hscNode.children,
-    'class-11-12-phys',
-    'Physics',
-    'subject',
-    '#ef4444'
-  );
-  ensureNode(
-    physNode.children,
-    'class-11-12-phys-1st',
-    '1st Paper',
-    'paper',
-    '#14b8a6'
-  );
-  ensureNode(
-    physNode.children,
-    'class-11-12-phys-2nd',
-    '2nd Paper',
-    'paper',
-    '#a855f7'
-  );
-
-  const mathNode = ensureNode(
-    hscNode.children,
-    'class-11-12-math',
-    'Higher Math',
-    'subject',
-    '#84cc16'
-  );
-  ensureNode(
-    mathNode.children,
-    'class-11-12-math-1st',
-    '1st Paper',
-    'paper',
-    '#06b6d4'
-  );
-  ensureNode(
-    mathNode.children,
-    'class-11-12-math-2nd',
-    '2nd Paper',
-    'paper',
-    '#f97316'
-  );
-
-  const bioNode = ensureNode(
-    hscNode.children,
-    'class-11-12-bio',
-    'Biology',
-    'subject',
-    '#ec4899'
-  );
-  ensureNode(
-    bioNode.children,
-    'class-11-12-bio-1st',
-    '1st Paper',
-    'paper',
-    '#ec4899'
-  );
-  ensureNode(
-    bioNode.children,
-    'class-11-12-bio-2nd',
-    '2nd Paper',
-    'paper',
-    '#8b5cf6'
-  );
+  for (const preset of DEFAULT_SUBJECT_PAPERS) {
+    const cNode = ensureNode(
+      rootList,
+      `class-${preset.className.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      preset.className,
+      'class',
+      CLASS_COLORS[preset.className] || '#38bdf8'
+    );
+    const sNode = ensureNode(
+      cNode.children,
+      `subj-${preset.className}-${preset.subject}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
+      preset.subject,
+      'subject',
+      preset.color
+    );
+    ensureNode(
+      sNode.children,
+      `paper-${preset.id}`,
+      preset.paper,
+      'paper',
+      preset.color
+    );
+  }
 
   for (const page of pages) {
     const normalizedClass = normalizeClassName(page.className);
     const cNode = ensureNode(
       rootList,
-      `class-${normalizedClass}`,
+      `class-${normalizedClass.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       normalizedClass,
       'class',
       CLASS_COLORS[normalizedClass] || '#f43f5e'
     );
     const sNode = ensureNode(
       cNode.children,
-      `subj-${normalizedClass}-${page.subject}`,
+      `subj-${normalizedClass}-${page.subject}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
       page.subject,
       'subject',
       '#3b82f6'
     );
     const pNode = ensureNode(
       sNode.children,
-      `paper-${normalizedClass}-${page.subject}-${page.paper}`,
+      `paper-${normalizedClass}-${page.subject}-${page.paper}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
       page.paper,
       'paper',
       '#38bdf8'
     );
     const chNode = ensureNode(
       pNode.children,
-      `chap-${normalizedClass}-${page.subject}-${page.paper}-${page.chapter}`,
+      `chap-${normalizedClass}-${page.subject}-${page.paper}-${page.chapter}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
       page.chapter,
       'chapter',
       '#f59e0b'
@@ -557,108 +907,25 @@ export function buildFolderHierarchy(
 }
 
 /**
- * Returns the "Subject Name with Paper" folder cards for the Home Page.
- * If a student has configured their class in their profile (or selected a class filter),
- * only that class's Subject + Paper folders are returned.
+ * Returns the Subject + Paper folder cards for the Home Page or a specific Class.
  */
 export function getSubjectPaperCards(
   pages: LibraryTopicPage[],
   activeClassFilter: string = 'ALL'
 ): SubjectPaperCard[] {
-  const DEFAULT_SUBJECT_PAPERS: Omit<
-    SubjectPaperCard,
-    'count' | 'pages' | 'chapterCount'
-  >[] = [
-    {
-      id: 'hsc-chemistry-2nd',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Chemistry',
-      paper: '2nd Paper',
-      displayName: 'Chemistry 2nd Paper',
-      color: '#38bdf8',
-    },
-    {
-      id: 'hsc-chemistry-1st',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Chemistry',
-      paper: '1st Paper',
-      displayName: 'Chemistry 1st Paper',
-      color: '#10b981',
-    },
-    {
-      id: 'hsc-physics-1st',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Physics',
-      paper: '1st Paper',
-      displayName: 'Physics 1st Paper',
-      color: '#f59e0b',
-    },
-    {
-      id: 'hsc-physics-2nd',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Physics',
-      paper: '2nd Paper',
-      displayName: 'Physics 2nd Paper',
-      color: '#a855f7',
-    },
-    {
-      id: 'hsc-math-1st',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Higher Math',
-      paper: '1st Paper',
-      displayName: 'Higher Math 1st Paper',
-      color: '#84cc16',
-    },
-    {
-      id: 'hsc-math-2nd',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Higher Math',
-      paper: '2nd Paper',
-      displayName: 'Higher Math 2nd Paper',
-      color: '#f97316',
-    },
-    {
-      id: 'hsc-bio-1st',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Biology',
-      paper: '1st Paper',
-      displayName: 'Biology 1st Paper',
-      color: '#ec4899',
-    },
-    {
-      id: 'hsc-bio-2nd',
-      className: 'Class 11-12 (HSC)',
-      subject: 'Biology',
-      paper: '2nd Paper',
-      displayName: 'Biology 2nd Paper',
-      color: '#8b5cf6',
-    },
-    {
-      id: 'ssc-chemistry',
-      className: 'Class 9-10 (SSC)',
-      subject: 'Chemistry',
-      paper: 'SSC',
-      displayName: 'Chemistry (SSC)',
-      color: '#10b981',
-    },
-    {
-      id: 'ssc-physics',
-      className: 'Class 9-10 (SSC)',
-      subject: 'Physics',
-      paper: 'SSC',
-      displayName: 'Physics (SSC)',
-      color: '#f59e0b',
-    },
-  ];
-
   const cardMap = new Map<string, SubjectPaperCard>();
 
   for (const preset of DEFAULT_SUBJECT_PAPERS) {
     const key = `${preset.className}::${preset.subject}::${preset.paper}`;
     const presetChapters = CURRICULUM_CHAPTERS[key] || [];
+    const totalSemiChapters = presetChapters.reduce(
+      (sum, ch) => sum + (ch.semiChapters ? ch.semiChapters.length : 0),
+      0
+    );
     cardMap.set(key, {
       ...preset,
       chapterCount: presetChapters.length || 1,
+      semiChapterCount: totalSemiChapters > 0 ? totalSemiChapters : undefined,
       count: 0,
       pages: [],
     });
@@ -670,9 +937,16 @@ export function getSubjectPaperCards(
     let card = cardMap.get(key);
     if (!card) {
       const displayName =
-        page.paper && page.paper !== 'Single Paper'
+        page.paper && page.paper !== 'Single Paper' && page.paper !== 'Main Paper'
           ? `${page.subject} ${page.paper}`
           : page.subject;
+      const isDivisional = [
+        'Physics',
+        'Chemistry',
+        'Higher Math',
+        'Biology',
+        'General Science',
+      ].includes(page.subject);
       card = {
         id: `sp-${normClass}-${page.subject}-${page.paper}`
           .toLowerCase()
@@ -681,6 +955,7 @@ export function getSubjectPaperCards(
         subject: page.subject,
         paper: page.paper,
         displayName,
+        category: isDivisional ? 'divisional' : 'compulsory',
         color: page.folderColor || '#38bdf8',
         chapterCount: 1,
         count: 0,
@@ -694,58 +969,16 @@ export function getSubjectPaperCards(
 
   const allCards = Array.from(cardMap.values());
   if (!activeClassFilter || activeClassFilter === 'ALL') {
-    return allCards.filter(
-      (c) => c.className === 'Class 11-12 (HSC)' || c.count > 0
-    );
+    return allCards;
   }
 
   const normalizedFilter = normalizeClassName(activeClassFilter);
-  const filtered = allCards.filter((c) => c.className === normalizedFilter);
-  if (filtered.length > 0) {
-    return filtered;
-  }
-
-  // For Class 1 to Class 8 when selected by student profile or sidebar, return clean English Subject cards
-  return [
-    {
-      id: `${normalizedFilter}-science`,
-      className: normalizedFilter,
-      subject: 'General Science',
-      paper: 'Main Paper',
-      displayName: 'General Science',
-      color: CLASS_COLORS[normalizedFilter] || '#38bdf8',
-      chapterCount: 3,
-      count: 0,
-      pages: [],
-    },
-    {
-      id: `${normalizedFilter}-math`,
-      className: normalizedFilter,
-      subject: 'Mathematics',
-      paper: 'Main Paper',
-      displayName: 'Mathematics',
-      color: '#10b981',
-      chapterCount: 3,
-      count: 0,
-      pages: [],
-    },
-    {
-      id: `${normalizedFilter}-ict`,
-      className: normalizedFilter,
-      subject: 'ICT',
-      paper: 'Main Paper',
-      displayName: 'ICT',
-      color: '#f59e0b',
-      chapterCount: 2,
-      count: 0,
-      pages: [],
-    },
-  ];
+  return allCards.filter((c) => c.className === normalizedFilter);
 }
 
 /**
- * Returns the Chapters list for a selected Subject + Paper so tapping a Subject
- * opens its Chapters view first, and tapping a Chapter opens the Expanded Chapter Topics view.
+ * Returns the Chapters list (including direct clickable `semiChapters` for Bangla and English)
+ * for a selected Subject + Paper.
  */
 export function getChaptersForSubjectPaper(
   pages: LibraryTopicPage[],
@@ -755,36 +988,7 @@ export function getChaptersForSubjectPaper(
 ): ChapterItem[] {
   const normClass = normalizeClassName(className);
   const key = `${normClass}::${subject}::${paper}`;
-  const seeded = CURRICULUM_CHAPTERS[key] || [
-    {
-      chapterTitle: '1st Chapter: Introduction & Core Concepts',
-      shortDescription: `Core foundational principles of ${subject}`,
-      color: '#38bdf8',
-    },
-    {
-      chapterTitle: '2nd Chapter: Advanced Applications',
-      shortDescription: `Key formulas, problem solving & structured notes`,
-      color: '#10b981',
-    },
-  ];
-
-  const chapterMap = new Map<string, ChapterItem>();
-
-  seeded.forEach((ch, idx) => {
-    chapterMap.set(ch.chapterTitle, {
-      id: `ch-${normClass}-${subject}-${paper}-${idx + 1}`
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-'),
-      chapterNumber: idx + 1,
-      className: normClass,
-      subject,
-      paper,
-      chapterTitle: ch.chapterTitle,
-      shortDescription: ch.shortDescription,
-      color: ch.color,
-      pages: [],
-    });
-  });
+  const seeded = CURRICULUM_CHAPTERS[key] || [];
 
   const matchingPages = pages.filter(
     (p) =>
@@ -793,8 +997,68 @@ export function getChaptersForSubjectPaper(
       p.paper === paper
   );
 
+  const chapterMap = new Map<string, ChapterItem>();
+
+  seeded.forEach((ch, idx) => {
+    const semiItems: SemiChapterItem[] = (ch.semiChapters || []).map(
+      (semi, sIdx) => {
+        const semiId = `semi-${normClass}-${subject}-${paper}-${idx + 1}-${sIdx + 1}`
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-');
+        const matchedPage = matchingPages.find(
+          (p) =>
+            p.chapter === semi.title ||
+            p.title === semi.title ||
+            p.chapter === `${ch.chapterTitle} — ${semi.title}`
+        );
+        return {
+          id: semiId,
+          code: semi.code,
+          title: semi.title,
+          banglaTitle: semi.bangla,
+          chapterTitle: ch.chapterTitle,
+          className: normClass,
+          subject,
+          paper,
+          page: matchedPage,
+        };
+      }
+    );
+
+    chapterMap.set(ch.chapterTitle, {
+      id: `ch-${normClass}-${subject}-${paper}-${idx + 1}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
+      chapterNumber: idx + 1,
+      chapterCode: ch.chapterCode,
+      subjectCode: ch.subjectCode,
+      className: normClass,
+      subject,
+      paper,
+      chapterTitle: ch.chapterTitle,
+      banglaTitle: ch.banglaTitle,
+      shortDescription: ch.shortDescription,
+      color: ch.color,
+      pages: [],
+      semiChapters: semiItems,
+    });
+  });
+
   for (const page of matchingPages) {
     let chItem = chapterMap.get(page.chapter);
+    if (!chItem) {
+      // Check if this page matches a semi-chapter inside one of the seeded chapters
+      for (const existingChap of chapterMap.values()) {
+        if (
+          existingChap.semiChapters.some(
+            (s) => s.title === page.chapter || s.title === page.title
+          )
+        ) {
+          chItem = existingChap;
+          break;
+        }
+      }
+    }
     if (!chItem) {
       const nextNum = chapterMap.size + 1;
       chItem = {
@@ -802,13 +1066,15 @@ export function getChaptersForSubjectPaper(
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-'),
         chapterNumber: nextNum,
+        chapterCode: `Chapter ${String(nextNum).padStart(2, '0')}`,
         className: normClass,
         subject,
         paper,
         chapterTitle: page.chapter,
-        shortDescription: page.subtitle || 'Custom Chapter Notes',
+        shortDescription: page.subtitle || '',
         color: page.folderColor || '#38bdf8',
         pages: [],
+        semiChapters: [],
       };
       chapterMap.set(page.chapter, chItem);
     }
@@ -820,19 +1086,12 @@ export function getChaptersForSubjectPaper(
 
 export interface ViewingAreaCollapseState {
   isCollapsed: boolean;
-  collapseProgress: number; // 0 (expanded at top) to 1 (fully collapsed into compact app bar)
+  collapseProgress: number;
   viewingAreaOpacity: number;
   viewingAreaScale: number;
   compactHeaderTitleOpacity: number;
 }
 
-/**
- * Collapsible Viewing Area math:
- * At scrollTop = 0, the large centered Viewing Area is fully visible (opacity 1)
- * and the duplicate compact header title is hidden (opacity 0).
- * As the user scrolls past the threshold, the Viewing Area smoothly collapses and fades out,
- * while the compact title in the sticky top bar smoothly fades in.
- */
 export function computeViewingAreaCollapseState(
   scrollTop: number,
   threshold: number = 110
@@ -871,10 +1130,6 @@ export interface AdaptiveLayoutProfile {
   recommendedColumns: number;
 }
 
-/**
- * Detects device form factor across Phones, Passport-sized Square Foldables,
- * Book Foldables / Tablets, and DeX / Desktop PC monitors.
- */
 export function detectDeviceFormFactor(
   width: number,
   height: number
@@ -883,7 +1138,6 @@ export function detectDeviceFormFactor(
   const safeH = Math.max(320, height);
   const aspectRatio = safeW / safeH;
 
-  // Passport-sized / Square Foldable (e.g., 600px–940px width with square-ish aspect ratio 0.78..1.38)
   if (safeW >= 600 && safeW < 940 && aspectRatio >= 0.78 && aspectRatio <= 1.38) {
     return {
       formFactor: 'passport-foldable',
@@ -919,29 +1173,23 @@ export function detectDeviceFormFactor(
   };
 }
 
-/**
- * Resolves accessible foreground & soft-background color pairs across
- * OLED Dark Mode, Light ("White") Mode, and Warm Reading Mode so there is never
- * low-contrast neon text on white or black text on dark red/blue backgrounds.
- */
 export function getThemeAwareAccentPair(
   hexColor: string,
   theme: 'dark' | 'yellow' | 'light'
 ): { fg: string; bgSoft: string; bannerBg: string; bannerFg: string } {
   const normalized = (hexColor || '#38bdf8').toLowerCase();
 
-  // Map bright dark-mode palette colors to deep, high-contrast shades for Light & Reading modes
   const lightModeShadeMap: Record<string, string> = {
-    '#38bdf8': '#0284c7', // Sky -> Deep Ocean Blue
-    '#10b981': '#059669', // Emerald -> Deep Emerald
-    '#f59e0b': '#d97706', // Amber -> Deep Amber
-    '#a855f7': '#7e22ce', // Purple -> Deep Violet
-    '#ec4899': '#db2777', // Pink -> Deep Rose
-    '#f87171': '#dc2626', // Light Red -> Crisp Crimson
-    '#ef4444': '#dc2626', // Red -> Crisp Crimson
-    '#84cc16': '#4d7c0f', // Lime -> Deep Olive Green
-    '#f97316': '#ea580c', // Orange -> Deep Burnt Orange
-    '#8b5cf6': '#6d28d9', // Indigo-Violet -> Deep Indigo
+    '#38bdf8': '#0284c7',
+    '#10b981': '#059669',
+    '#f59e0b': '#d97706',
+    '#a855f7': '#7e22ce',
+    '#ec4899': '#db2777',
+    '#f87171': '#dc2626',
+    '#ef4444': '#dc2626',
+    '#84cc16': '#4d7c0f',
+    '#f97316': '#ea580c',
+    '#8b5cf6': '#6d28d9',
   };
 
   if (theme === 'dark') {
@@ -970,10 +1218,6 @@ export function getThemeAwareAccentPair(
   };
 }
 
-/**
- * Clamps window scrollTop to the active Viewing Area collapse range [0, maxThreshold]
- * so scrolling deeper in the page triggers zero unnecessary React state re-renders on low-end devices.
- */
 export function clampViewingAreaScroll(
   scrollTop: number,
   maxThreshold: number = 120
@@ -994,11 +1238,6 @@ export interface HardwareEfficiencyInput {
   userOverride?: EfficiencyOverrideMode;
 }
 
-/**
- * Determines whether Low-End Device Efficiency Mode should be active.
- * Automatically activates on <= 4 CPU cores, <= 4 GB RAM, Data Saver, or Reduced Motion,
- * while respecting manual user override ('auto' | 'enabled' | 'disabled').
- */
 export function shouldEnableLowEndEfficiency(
   input: HardwareEfficiencyInput
 ): boolean {
@@ -1016,5 +1255,3 @@ export function shouldEnableLowEndEfficiency(
   }
   return false;
 }
-
-
