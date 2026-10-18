@@ -14,11 +14,12 @@
     "test": "node --test src/utils/chemistrySections.test.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "electron:dist": "electron-builder --win --x64"
+    "electron:dist": "electron-builder --win --x64 --publish never"
   },
   "build": {
     "appId": "com.afeed.webbooks",
     "productName": "Web Books",
+    "publish": null,
     "directories": {
       "output": "release-builds"
     },
