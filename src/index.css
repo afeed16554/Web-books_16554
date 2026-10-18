@@ -5,30 +5,51 @@
 [data-theme="dark"] {
   --bg-primary: #000000;
   --bg-card: #121215;
-  --surface-subtle: #1c1c21;
+  --bg-rail: #141418;
+  --surface-subtle: #1c1c22;
   --text-main: #f5f5f7;
+  --text-secondary: #d1d5db;
   --text-muted: #9ca3af;
   --accent: #38bdf8;
+  --accent-contrast: #020617;
   --accent-soft: rgba(56, 189, 248, 0.14);
-  --border: #27272d;
-  --caution-bg: rgba(245, 158, 11, 0.14);
-  --caution-border: #fbbf24;
+  --border: #27272f;
+  --caution-bg: rgba(245, 158, 11, 0.12);
+  --caution-border: #f59e0b;
+  --caution-text: #fde68a;
+  --danger-bg: rgba(239, 68, 68, 0.14);
+  --danger-border: rgba(239, 68, 68, 0.45);
+  --danger-text: #fca5a5;
+  --success-bg: rgba(16, 185, 129, 0.14);
+  --success-border: rgba(16, 185, 129, 0.4);
+  --success-text: #6ee7b7;
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   --font-scale: 18px;
-  --warmth-opacity: 0;
 }
 
-/* Samsung One UI Clean Light Mode (#f2f2f7 canvas + #ffffff focus blocks) */
+/* Clean Light Mode (#f2f2f7 canvas + #ffffff focus blocks) */
 [data-theme="light"] {
   --bg-primary: #f2f2f7;
   --bg-card: #ffffff;
-  --surface-subtle: #e5e5ea;
-  --text-main: #111827;
-  --text-muted: #4b5563;
-  --accent: #007aff;
-  --accent-soft: rgba(0, 122, 255, 0.11);
-  --border: #e2e4ea;
-  --caution-bg: rgba(245, 158, 11, 0.12);
+  --bg-rail: #ffffff;
+  --surface-subtle: #e9ecf2;
+  --text-main: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #526071;
+  --accent: #0066cc;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(0, 102, 204, 0.1);
+  --border: #dde2eb;
+  --caution-bg: #fffbeb;
   --caution-border: #f59e0b;
+  --caution-text: #92400e;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #b91c1c;
+  --success-bg: #ecfdf5;
+  --success-border: #a7f3d0;
+  --success-text: #047857;
+  --card-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
 /* Reading Mode (Warm Paper Base) */
@@ -36,14 +57,25 @@
 [data-theme="yellow"] {
   --bg-primary: #f4ecd8;
   --bg-card: #fbf6e9;
-  --surface-subtle: #efe4ca;
-  --text-main: #2c221e;
-  --text-muted: #5c4b43;
+  --bg-rail: #f7efdc;
+  --surface-subtle: #eadec3;
+  --text-main: #261c15;
+  --text-secondary: #43342b;
+  --text-muted: #655246;
   --accent: #b45309;
-  --accent-soft: rgba(180, 83, 9, 0.14);
-  --border: #dfceb4;
-  --caution-bg: rgba(180, 83, 9, 0.12);
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(180, 83, 9, 0.12);
+  --border: #dccab0;
+  --caution-bg: rgba(217, 119, 6, 0.12);
   --caution-border: #d97706;
+  --caution-text: #78350f;
+  --danger-bg: #fef2f2;
+  --danger-border: #fca5a5;
+  --danger-text: #991b1b;
+  --success-bg: rgba(5, 150, 105, 0.12);
+  --success-border: rgba(5, 150, 105, 0.35);
+  --success-text: #065f46;
+  --card-shadow: 0 2px 12px rgba(44, 34, 30, 0.07);
 }
 
 * {
@@ -60,71 +92,177 @@ body {
   font-family: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif;
   font-size: var(--font-scale);
   line-height: 1.75;
-  transition: background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-    color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-  overflow-x: hidden;
+  transition: background-color 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow-x: clip;
   margin: 0;
   padding: 0;
 }
 
+/* Theme-safe Primary Accent Button (Never black text on dark blue/red in Light or Reading mode) */
+.btn-accent {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 700;
+  transition: opacity 0.18s ease, transform 0.16s ease;
+}
+
+.btn-accent:hover {
+  opacity: 0.92;
+}
+
+.btn-accent:active {
+  transform: scale(0.98);
+}
+
+/* Theme-safe Alert & Status Boxes */
+.alert-danger {
+  background-color: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+}
+
+.badge-success {
+  background-color: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+
 /* =====================================================================
-   SAMSUNG ONE UI LAYOUT & GRID SYSTEM (basic.html & grid.html)
+   ERGONOMIC DUAL-AREA LAYOUT, COLLAPSIBLE VIEWING AREA & ADAPTIVE GRID
    - Viewing Area: Top screen space with wide margins & center-aligned title,
-     recognized at a glance without interactive clutter.
+     smoothly collapses into the sticky compact App Bar when scrolling down.
    - Interaction Area: Below the viewing area, minimum 24dp (24px) keyline
      margins on left & right sides to avoid curved-edge conflicts & grip zones.
    - Focus Blocks: 26px squircle radius for Card Grid & Grouped List containers.
    ===================================================================== */
-.oneui-viewing-area {
+.wb-viewing-area {
   width: 100%;
-  padding: clamp(2rem, 5.5vh, 3.75rem) max(24px, 4vw) clamp(1.5rem, 3.5vh, 2.5rem);
+  min-height: clamp(160px, 24vh, 235px);
+  padding: clamp(1.75rem, 4.5vh, 3.25rem) max(24px, 4vw) clamp(1.25rem, 3vh, 2.25rem);
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   user-select: none;
+  transform-origin: top center;
+  backface-visibility: hidden;
+  transition: opacity 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
 }
 
-.oneui-interaction-area {
+.wb-viewing-area.is-collapsed {
+  pointer-events: none;
+}
+
+.wb-viewing-area.is-manually-collapsed {
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Passport-sized / Square Foldable optimization (600px–940px with near-square aspect ratio) */
+@media (min-width: 600px) and (max-width: 940px) and (max-height: 960px) {
+  .wb-viewing-area {
+    min-height: clamp(120px, 17vh, 165px);
+    padding-top: 1.25rem;
+    padding-bottom: 1rem;
+  }
+}
+
+.wb-interaction-area {
   width: 100%;
-  padding-left: max(24px, 2.75vw);
-  padding-right: max(24px, 2.75vw);
-  padding-bottom: 4rem;
+  padding-left: max(20px, 2.5vw);
+  padding-right: max(20px, 2.5vw);
+  padding-bottom: 4.5rem;
 }
 
-/* Focus Block Container (Grouped List or Singular Block) — 26px One UI Radius */
-.oneui-focus-block {
+@media (min-width: 768px) {
+  .wb-interaction-area {
+    padding-left: max(24px, 2.75vw);
+    padding-right: max(24px, 2.75vw);
+  }
+}
+
+/* Pill Breadcrumb Bar */
+.wb-breadcrumb-pill {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 0.55rem 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  box-shadow: var(--card-shadow);
+}
+
+/* Focus Block Container (Grouped List or Singular Block) — 26px Squircle Radius */
+.wb-focus-block {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 26px;
   overflow: hidden;
-  transition: background-color 0.25s ease, border-color 0.25s ease;
+  box-shadow: var(--card-shadow);
+  transition: background-color 0.22s ease, border-color 0.22s ease;
 }
 
-/* Focus Block Card (Card Grid / 2-Column / 3-Column Grid) — 26px One UI Radius */
-.oneui-focus-card {
+/* Focus Block Card (Card Grid / Multi-Column Grid) — 26px Squircle Radius */
+.wb-focus-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 26px;
-  padding: 1.35rem 1.4rem;
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.24s ease,
-    background-color 0.24s ease;
+  padding: 1.3rem 1.35rem;
+  box-shadow: var(--card-shadow);
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s ease,
+    background-color 0.22s ease;
 }
 
-.oneui-focus-card:hover {
+.wb-focus-card:hover {
   border-color: var(--accent);
   background-color: var(--surface-subtle);
-  transform: translateY(-2px);
+  transform: translate3d(0, -2px, 0);
 }
 
-.oneui-focus-card:active {
+.wb-focus-card:active {
   transform: scale(0.985);
 }
 
-/* Grouped List Item inside a One UI Focus Block */
-.oneui-list-row {
+/* Document Note Card (with high-contrast colored top header banner) */
+.wb-note-doc-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s ease;
+}
+
+.wb-note-doc-card:hover {
+  border-color: var(--accent);
+  transform: translate3d(0, -3px, 0);
+}
+
+.wb-note-doc-card:active {
+  transform: scale(0.985);
+}
+
+/* Grouped List Item inside a Focus Block */
+.wb-list-row {
   width: 100%;
   min-height: 68px;
   padding: 0.95rem 1.35rem;
@@ -133,48 +271,122 @@ body {
   justify-content: space-between;
   gap: 1rem;
   text-align: left;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.18s ease;
   border-bottom: 1px solid var(--border);
 }
 
-.oneui-list-row:last-child {
+.wb-list-row:last-child {
   border-bottom: none;
 }
 
-.oneui-list-row:hover {
+.wb-list-row:hover {
   background-color: var(--surface-subtle);
 }
 
-.oneui-list-row:active {
+.wb-list-row:active {
   background-color: var(--accent-soft);
 }
 
-/* Smooth layout & view transitions */
-.smooth-sidebar {
-  transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.25s ease;
-  will-change: width, transform, opacity;
+/* =====================================================================
+   ULTRA-FLUID GPU-ACCELERATED SIDEBAR DRAWER & WORKSPACE TRANSITIONS
+   - Uses a fixed-width inner container (.wb-sidebar-inner = 18rem) with
+     CSS containment (contain: layout paint) so internal text, buttons, and
+     folder trees NEVER reflow or re-wrap during open/close animations!
+   - On Mobile (< 768px): Pure GPU compositor slide (translate3d + opacity).
+   - On Desktop / DeX (>= 768px): Synchronized spring curve matching the
+     Viewing Area (cubic-bezier(0.22, 1, 0.36, 1)).
+   ===================================================================== */
+.wb-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100dvh;
+  width: 18rem;
+  z-index: 40;
+  flex-shrink: 0;
+  background-color: var(--bg-card);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  contain: layout paint;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wb-sidebar.is-open {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wb-sidebar.is-closed {
+  transform: translate3d(-102%, 0, 0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wb-sidebar-inner {
+  width: 18rem;
+  min-width: 18rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  contain: layout style;
+  backface-visibility: hidden;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 768px) {
+  .wb-sidebar {
+    position: sticky;
+    will-change: width, transform, opacity;
+    transition: width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.2s ease;
+  }
+
+  .wb-sidebar.is-open {
+    width: 18rem;
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+
+  .wb-sidebar.is-closed {
+    width: 0rem;
+    border-right-width: 0px;
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+
+  .wb-sidebar.is-open .wb-sidebar-inner {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+
+  .wb-sidebar.is-closed .wb-sidebar-inner {
+    transform: translate3d(-24px, 0, 0);
+    opacity: 0;
+  }
 }
 
 .smooth-workspace {
-  transition: padding 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 0;
+  flex: 1 1 0%;
 }
 
 .view-transition-enter {
-  animation: viewSmoothFade 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: viewSmoothFade 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes viewSmoothFade {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translate3d(0, 6px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -183,17 +395,51 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
-  padding: 1rem 0 5rem;
+  padding: 0.75rem 0 5rem;
 }
 
 .topic-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 26px;
-  padding: clamp(1.35rem, 2.5vw, 2.25rem);
+  padding: clamp(1.25rem, 2.5vw, 2.25rem);
   margin-bottom: 1.5rem;
   scroll-margin-top: 4.5rem;
-  transition: border-color 0.25s ease, background-color 0.25s ease;
+  box-shadow: var(--card-shadow);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 460px;
+  contain: layout style;
+  transition: border-color 0.22s ease, background-color 0.22s ease;
+}
+
+/* =====================================================================
+   LOW-END DEVICE EFFICIENCY MODE (60fps Budget Phone & Low-RAM Optimization)
+   Eliminates expensive offscreen GPU Gaussian blur passes & multi-layer shadows
+   ===================================================================== */
+[data-efficiency="low-end"] {
+  --card-shadow: none;
+}
+
+[data-efficiency="low-end"] header,
+[data-efficiency="low-end"] .backdrop-blur-md,
+[data-efficiency="low-end"] .backdrop-blur-sm,
+[data-efficiency="low-end"] .backdrop-blur-\[1px\] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-efficiency="low-end"] header {
+  background-color: var(--bg-primary) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .topic-badge {
@@ -201,16 +447,12 @@ body {
   align-items: center;
   gap: 0.5rem;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   padding: 0.3rem 1rem;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   margin-bottom: 1.25rem;
-}
-
-[data-theme="oled"] .topic-badge {
-  color: #020617;
 }
 
 .topic-section h2 {
@@ -243,12 +485,13 @@ body {
   border-radius: 18px;
   border: 1px solid var(--border);
   margin: 1rem 0;
+  background: var(--bg-card);
 }
 
 .table-wrapper table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 640px;
+  min-width: 600px;
 }
 
 .table-wrapper th,
@@ -257,6 +500,7 @@ body {
   border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: middle;
+  color: var(--text-main);
 }
 
 .table-wrapper tr:last-child td {
@@ -264,7 +508,8 @@ body {
 }
 
 .table-wrapper th {
-  background: rgba(128, 128, 128, 0.1);
+  background: var(--surface-subtle);
+  color: var(--text-main);
   font-weight: 700;
 }
 
@@ -273,14 +518,16 @@ details.interactive-drop {
   border: 1px solid var(--border);
   border-radius: 18px;
   margin: 0.85rem 0;
-  background: rgba(128, 128, 128, 0.04);
+  background: var(--surface-subtle);
+  color: var(--text-main);
   overflow: hidden;
-  transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: all 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 details.interactive-drop summary {
   padding: 0.85rem 1.15rem;
   font-weight: 600;
+  color: var(--text-main);
   cursor: pointer;
   list-style: none;
   display: flex;
@@ -291,7 +538,7 @@ details.interactive-drop summary {
 }
 
 details.interactive-drop summary:hover {
-  background: rgba(128, 128, 128, 0.06);
+  background: var(--accent-soft);
 }
 
 details.interactive-drop summary::-webkit-details-marker {
@@ -302,9 +549,9 @@ details.interactive-drop summary::after {
   content: "See";
   font-size: 0.78rem;
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent);
-  background: var(--accent-soft);
+  background: var(--bg-card);
   border: 1px solid var(--accent);
   padding: 0.28rem 0.72rem;
   border-radius: 10px;
@@ -317,13 +564,15 @@ details.interactive-drop summary::after {
 details[open].interactive-drop summary::after {
   content: "Hide";
   transform: none;
-  background: rgba(128, 128, 128, 0.14);
+  background: var(--bg-card);
   border-color: var(--border);
   color: var(--text-muted);
 }
 
 .drop-content {
-  padding: 0.75rem 1.15rem 1.15rem;
+  padding: 0.85rem 1.15rem 1.15rem;
+  background: var(--bg-card);
+  color: var(--text-main);
   border-top: 1px solid var(--border);
   animation: blurIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -339,33 +588,61 @@ details[open].interactive-drop summary::after {
   }
 }
 
-/* Warning / Caution Box */
+/* Warning / Caution Box — High Contrast in Dark, Light, and Reading modes */
 .caution-box {
   background: var(--caution-bg);
   border: 1px solid var(--caution-border);
+  color: var(--text-main);
   padding: 0.95rem 1.2rem;
   border-radius: 16px;
   margin: 1rem 0;
   font-weight: 500;
 }
 
-/* SVG Diagram Container */
+.caution-box strong {
+  color: var(--caution-text);
+}
+
+[data-theme="light"] .caution-box strong,
+[data-theme="reading"] .caution-box strong {
+  color: var(--caution-text);
+}
+
+/* SVG Diagram Container & Theme-Adaptive Stroke/Fill Contrast */
 .svg-diagram {
   width: 100%;
   overflow-x: auto;
   padding: 1rem;
   text-align: center;
-  background: rgba(128, 128, 128, 0.03);
+  background: var(--surface-subtle);
+  color: var(--text-main);
   border-radius: 18px;
   border: 1px dashed var(--border);
   margin: 1rem 0;
 }
 
 .svg-diagram svg {
-  min-width: 620px;
+  min-width: 600px;
   height: auto;
   display: block;
   margin: 0 auto;
+  color: var(--text-main);
+}
+
+/* Ensure bright cyan/amber SVG arrows in chemistrySections.ts have crisp contrast in Light & Reading modes */
+[data-theme="light"] .svg-diagram svg [stroke="#38bdf8"],
+[data-theme="reading"] .svg-diagram svg [stroke="#38bdf8"] {
+  stroke: var(--accent) !important;
+}
+
+[data-theme="light"] .svg-diagram svg [fill="#38bdf8"],
+[data-theme="reading"] .svg-diagram svg [fill="#38bdf8"] {
+  fill: var(--accent) !important;
+}
+
+[data-theme="light"] .svg-diagram svg [stroke="#f59e0b"],
+[data-theme="reading"] .svg-diagram svg [stroke="#f59e0b"] {
+  stroke: #b45309 !important;
 }
 
 /* KaTeX overflow safety and Bangla glyph rendering inside \text{} */
@@ -373,6 +650,11 @@ details[open].interactive-drop summary::after {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.35rem 0;
+  color: var(--text-main);
+}
+
+.katex {
+  color: var(--text-main);
 }
 
 .katex .text,

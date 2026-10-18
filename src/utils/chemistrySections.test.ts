@@ -15,12 +15,17 @@ import {
   ALL_CLASS_LEVELS,
   BUILT_IN_PAGES,
   buildFolderHierarchy,
+  clampViewingAreaScroll,
+  computeViewingAreaCollapseState,
+  detectDeviceFormFactor,
   extractMainTopicsFromHtml,
   formatCleanReaderHeader,
   getChaptersForSubjectPaper,
   getSubjectPaperCards,
+  getThemeAwareAccentPair,
   isAuthorizedAdminEmail,
   PRIMARY_ADMIN_EMAIL,
+  shouldEnableLowEndEfficiency,
 } from './libraryCatalog.ts';
 
 test('All 5 batches contain the expected 13 sections and 12 main navigation topics', () => {
@@ -168,3 +173,90 @@ test('extractMainTopicsFromHtml parses section ids and h2 titles', () => {
   assert.equal(topics[0].id, 'sec-a');
   assert.equal(topics[0].title, '1. Alkanes');
 });
+
+test('Collapsible Viewing Area collapses smoothly on scroll', () => {
+  const topState = computeViewingAreaCollapseState(0, 110);
+  assert.equal(topState.isCollapsed, false);
+  assert.equal(topState.viewingAreaOpacity, 1);
+  assert.equal(topState.compactHeaderTitleOpacity, 0);
+
+  const scrolledState = computeViewingAreaCollapseState(120, 110);
+  assert.equal(scrolledState.isCollapsed, true);
+  assert.equal(scrolledState.viewingAreaOpacity, 0);
+  assert.equal(scrolledState.compactHeaderTitleOpacity, 1);
+});
+
+test('Adaptive device form-factor detector distinguishes Phone, Passport Foldable, Tablet Foldable, and DeX / Desktop PC', () => {
+  const phone = detectDeviceFormFactor(390, 844);
+  assert.equal(phone.formFactor, 'phone');
+  assert.equal(phone.showCompactRailWhenCollapsed, false);
+
+  const passport = detectDeviceFormFactor(740, 720);
+  assert.equal(passport.formFactor, 'passport-foldable');
+  assert.equal(passport.showCompactRailWhenCollapsed, true);
+
+  const tablet = detectDeviceFormFactor(1024, 768);
+  assert.equal(tablet.formFactor, 'tablet-foldable');
+
+  const dex = detectDeviceFormFactor(1920, 1080);
+  assert.equal(dex.formFactor, 'dex-desktop');
+  assert.equal(dex.label, 'DeX / Desktop PC');
+  assert.equal(dex.recommendedColumns, 5);
+});
+
+test('getThemeAwareAccentPair prevents black-on-red contrast bugs in Light, Reading, and Dark modes', () => {
+  const lightRed = getThemeAwareAccentPair('#ef4444', 'light');
+  assert.equal(lightRed.bannerFg, '#ffffff', 'Light mode red banner must use white foreground text');
+  assert.equal(lightRed.fg, '#dc2626');
+
+  const darkRed = getThemeAwareAccentPair('#ef4444', 'dark');
+  assert.equal(darkRed.bannerFg, '#ffffff', 'Dark mode red banner must also use white foreground text');
+
+  const darkSky = getThemeAwareAccentPair('#38bdf8', 'dark');
+  assert.equal(darkSky.bannerFg, '#020617', 'Dark mode bright cyan banner uses dark contrast text');
+});
+
+test('clampViewingAreaScroll clamps scroll values to prevent unnecessary re-renders on low-end devices', () => {
+  assert.equal(clampViewingAreaScroll(-20, 120), 0);
+  assert.equal(clampViewingAreaScroll(0, 120), 0);
+  assert.equal(clampViewingAreaScroll(55.4, 120), 55);
+  assert.equal(clampViewingAreaScroll(120, 120), 120);
+  assert.equal(clampViewingAreaScroll(2450, 120), 120);
+});
+
+test('shouldEnableLowEndEfficiency detects low-end hardware and respects user overrides', () => {
+  assert.equal(
+    shouldEnableLowEndEfficiency({
+      hardwareConcurrency: 4,
+      deviceMemory: 3,
+      userOverride: 'auto',
+    }),
+    true
+  );
+  assert.equal(
+    shouldEnableLowEndEfficiency({
+      hardwareConcurrency: 8,
+      deviceMemory: 8,
+      userOverride: 'auto',
+    }),
+    false
+  );
+  assert.equal(
+    shouldEnableLowEndEfficiency({
+      hardwareConcurrency: 8,
+      deviceMemory: 8,
+      userOverride: 'enabled',
+    }),
+    true
+  );
+  assert.equal(
+    shouldEnableLowEndEfficiency({
+      hardwareConcurrency: 2,
+      deviceMemory: 2,
+      userOverride: 'disabled',
+    }),
+    false
+  );
+});
+
+

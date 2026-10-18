@@ -1,6 +1,6 @@
 # <a href="https://afeed16554.github.io/Web-books_16554/">Web Books by Afeed</a>
 
-> **Clean, Distraction-Free Samsung One UI Digital Concept Reader & Open-Source Chemistry Notebook**  
+> **Clean, Distraction-Free Multi-Platform Digital Concept Reader & Open-Source Chemistry Notebook**  
 > *Engineered for students, educators, and lifelong learners — featuring OLED Pitch-Black mode, KaTeX `mhchem` mathematical chemistry rendering, adaptive 2D molecular SVGs, and zero data loss textbook transcription.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -16,7 +16,7 @@
 ## 📖 Table of Contents
 
 - [Overview](#overview)
-- [Design Philosophy (Samsung One UI)](#design-philosophy-samsung-one-ui)
+- [Design Philosophy (Ergonomic Dual-Area Architecture)](#design-philosophy-ergonomic-dual-area-architecture)
 - [Key Features](#key-features)
 - [User Guide & Instructions Manual](#user-guide--instructions-manual)
   - [1. Browsing & Navigation](#1-browsing--navigation)
@@ -37,7 +37,7 @@
 
 ## 🌟 Overview
 
-**Web Books by Afeed** transforms dense, cluttered textbooks into a modern, serene digital reading experience inspired by Samsung One UI and modern digital note apps. 
+**Web Books by Afeed** transforms dense, cluttered textbooks into a modern, serene digital reading experience engineered for phones, foldables, DeX, and desktop PCs. 
 
 Traditional physical textbooks often cram complex multi-step chemical reactions, conditions, temperatures, catalysts, and yields into narrow, hard-to-read print columns. **Web Books** eliminates cognitive overload by reorganizing materials into structured, expandable topic blocks with:
 - **Responsive chemical reaction tables** with KaTeX `mhchem` LaTeX rendering.
@@ -47,12 +47,12 @@ Traditional physical textbooks often cram complex multi-step chemical reactions,
 
 ---
 
-## 📐 Design Philosophy (Samsung One UI)
+## 📐 Design Philosophy (Ergonomic Dual-Area Architecture)
 
-Following the official [Samsung One UI Design Guidelines](https://developer.samsung.com/one-ui):
+Engineered with an ergonomic dual-area architecture for effortless one-handed mobile reach and multi-window DeX / desktop productivity:
 
-1. **Viewing Area vs. Interaction Area**:
-   - The top portion of the screen is a clean, non-interactive **Viewing Area** providing immediate context (App name, current subject, chapter, or active filters).
+1. **Collapsible Viewing Area vs. Interaction Area**:
+   - The top portion of the screen is a clean, collapsible **Viewing Area** providing immediate context (App name, current subject, chapter, or active filters) that smoothly retracts into the sticky header bar as you scroll.
    - The lower portion is an ergonomic **Interaction Area** containing cards and controls positioned within natural reach zones for one-handed thumb interaction.
 2. **Three-Tier Hierarchical Drill-Down**:
    - **Stage 1 (Subjects)**: Tap Subject & Paper cards (e.g., *Chemistry 2nd Paper*, *Higher Math 1st Paper*).
@@ -205,6 +205,63 @@ npm run preview
 
 ---
 
+## 📱💻 Multi-OS Native App Plan (Android, iOS, Windows, macOS & Linux — ARM64 & x86_64)
+
+Because **Web Books by Afeed** compiles to a self-contained static bundle (`dist/`), you can ship native apps across all 5 operating systems and both CPU architectures (`ARM64` & `x86_64`) from this single codebase:
+
+### 1. Adaptive Form-Factor Matrix
+| Form Factor | Viewport Range | Adaptive Grid & Layout Behavior |
+| :--- | :--- | :--- |
+| **Phones** | `< 640px` | 1-column focus blocks, slide-over drawer, thumb-reachable Collapsible Viewing Area |
+| **Passport / Square Foldables** | `600px–940px` (`0.78–1.38` ratio) | Compact Viewing Area + balanced 2-column focus card grid |
+| **Book Foldables & Tablets** | `640px–1179px` | 2-to-3 column focus grid + persistent or toggleable navigation sidebar |
+| **DeX / Android Desktop & PC** | `>= 1180px` | 4-to-5 column focus grid + full keyboard/mouse ergonomics + header form-factor indicator |
+
+### 2. Android (`.apk` / `.aab`) & iOS (`.ipa`) — Capacitor 6
+1. Install Capacitor in the project root:
+   ```bash
+   npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+   npx cap init "Web Books" com.afeed.webbooks --web-dir=dist
+   npm run build
+   npx cap add android
+   npx cap add ios
+   npx cap sync
+   ```
+2. **Android (`ARM64` + `x86_64`)**:
+   - In `android/app/build.gradle`, enable multi-ABI support for phones/foldables (`arm64-v8a`) and Chromebooks / Android Desktop / Emulators (`x86_64`):
+     ```groovy
+     defaultConfig {
+         ndk {
+             abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+         }
+     }
+     ```
+   - In `AndroidManifest.xml`, keep `android:resizeableActivity="true"` so DeX and foldable multi-window transitions work seamlessly.
+   - Build signed APK/AAB via `cd android && ./gradlew assembleRelease bundleRelease`.
+3. **iOS / iPadOS (`ARM64`)**:
+   - Run `npx cap open ios` on macOS with Xcode and archive for iPhone & iPad (`arm64`).
+
+### 3. Windows, macOS & Linux Desktop (`ARM64` + `x86_64`) — Tauri v2 (Rust)
+Tauri v2 uses the operating system's native webview (WebView2 on Windows, WebKit on macOS/Linux) to produce ~6 MB native installers instead of 150 MB Electron bundles:
+```bash
+npm install -D @tauri-apps/cli@latest
+npx tauri init
+
+# Windows x86_64 & Windows on ARM64 (.msi / .exe NSIS):
+npx tauri build --target x86_64-pc-windows-msvc
+npx tauri build --target aarch64-pc-windows-msvc
+
+# macOS Universal Binary (Apple Silicon ARM64 + Intel x86_64 .dmg / .app):
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npx tauri build --target universal-apple-darwin
+
+# Linux x86_64 & ARM64 (.deb / .AppImage / .rpm):
+npx tauri build --target x86_64-unknown-linux-gnu
+npx tauri build --target aarch64-unknown-linux-gnu
+```
+
+---
+
 ## 🤝 Contributing
 
 Contributions, issues, and feature requests are welcome!
@@ -227,4 +284,4 @@ This project is open-source and distributed under the **MIT License**. See the [
 
 * **Creator**: **Afeed** (`fha16554@gmail.com`)
 * **Project**: **Web Books**
-* Designed with reference to [Samsung One UI Guidelines](https://developer.samsung.com/one-ui) and modern digital note ergonomics.
+* Engineered for multi-platform digital textbook reading across Phones, Foldables, DeX, and Desktop PCs.

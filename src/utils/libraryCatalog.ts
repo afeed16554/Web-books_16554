@@ -132,7 +132,7 @@ export const BUILT_IN_PAGES: LibraryTopicPage[] = [
       title: t.title,
     })),
     isBuiltIn: true,
-    folderColor: '#38bdf8',
+    folderColor: '#ef4444',
   },
 ];
 
@@ -817,3 +817,204 @@ export function getChaptersForSubjectPaper(
 
   return Array.from(chapterMap.values());
 }
+
+export interface ViewingAreaCollapseState {
+  isCollapsed: boolean;
+  collapseProgress: number; // 0 (expanded at top) to 1 (fully collapsed into compact app bar)
+  viewingAreaOpacity: number;
+  viewingAreaScale: number;
+  compactHeaderTitleOpacity: number;
+}
+
+/**
+ * Collapsible Viewing Area math:
+ * At scrollTop = 0, the large centered Viewing Area is fully visible (opacity 1)
+ * and the duplicate compact header title is hidden (opacity 0).
+ * As the user scrolls past the threshold, the Viewing Area smoothly collapses and fades out,
+ * while the compact title in the sticky top bar smoothly fades in.
+ */
+export function computeViewingAreaCollapseState(
+  scrollTop: number,
+  threshold: number = 110
+): ViewingAreaCollapseState {
+  const safeThreshold = Math.max(20, threshold);
+  const clampedScroll = Math.max(0, scrollTop);
+  const collapseProgress = Math.min(1, clampedScroll / safeThreshold);
+  const isCollapsed = collapseProgress >= 0.62;
+  const viewingAreaOpacity = Number(
+    Math.max(0, 1 - collapseProgress * 1.35).toFixed(3)
+  );
+  const viewingAreaScale = Number((1 - collapseProgress * 0.08).toFixed(3));
+  const compactHeaderTitleOpacity = Number(
+    Math.min(1, Math.max(0, (collapseProgress - 0.35) / 0.65)).toFixed(3)
+  );
+
+  return {
+    isCollapsed,
+    collapseProgress: Number(collapseProgress.toFixed(3)),
+    viewingAreaOpacity,
+    viewingAreaScale,
+    compactHeaderTitleOpacity,
+  };
+}
+
+export type DeviceFormFactor =
+  | 'phone'
+  | 'passport-foldable'
+  | 'tablet-foldable'
+  | 'dex-desktop';
+
+export interface AdaptiveLayoutProfile {
+  formFactor: DeviceFormFactor;
+  label: string;
+  showCompactRailWhenCollapsed: boolean;
+  recommendedColumns: number;
+}
+
+/**
+ * Detects device form factor across Phones, Passport-sized Square Foldables,
+ * Book Foldables / Tablets, and DeX / Desktop PC monitors.
+ */
+export function detectDeviceFormFactor(
+  width: number,
+  height: number
+): AdaptiveLayoutProfile {
+  const safeW = Math.max(320, width);
+  const safeH = Math.max(320, height);
+  const aspectRatio = safeW / safeH;
+
+  // Passport-sized / Square Foldable (e.g., 600px–940px width with square-ish aspect ratio 0.78..1.38)
+  if (safeW >= 600 && safeW < 940 && aspectRatio >= 0.78 && aspectRatio <= 1.38) {
+    return {
+      formFactor: 'passport-foldable',
+      label: 'Passport / Square Foldable',
+      showCompactRailWhenCollapsed: true,
+      recommendedColumns: 2,
+    };
+  }
+
+  if (safeW < 640) {
+    return {
+      formFactor: 'phone',
+      label: 'Phone',
+      showCompactRailWhenCollapsed: false,
+      recommendedColumns: 1,
+    };
+  }
+
+  if (safeW < 1180) {
+    return {
+      formFactor: 'tablet-foldable',
+      label: 'Tablet / Book Foldable',
+      showCompactRailWhenCollapsed: true,
+      recommendedColumns: 3,
+    };
+  }
+
+  return {
+    formFactor: 'dex-desktop',
+    label: 'DeX / Desktop PC',
+    showCompactRailWhenCollapsed: true,
+    recommendedColumns: safeW >= 1536 ? 5 : 4,
+  };
+}
+
+/**
+ * Resolves accessible foreground & soft-background color pairs across
+ * OLED Dark Mode, Light ("White") Mode, and Warm Reading Mode so there is never
+ * low-contrast neon text on white or black text on dark red/blue backgrounds.
+ */
+export function getThemeAwareAccentPair(
+  hexColor: string,
+  theme: 'dark' | 'yellow' | 'light'
+): { fg: string; bgSoft: string; bannerBg: string; bannerFg: string } {
+  const normalized = (hexColor || '#38bdf8').toLowerCase();
+
+  // Map bright dark-mode palette colors to deep, high-contrast shades for Light & Reading modes
+  const lightModeShadeMap: Record<string, string> = {
+    '#38bdf8': '#0284c7', // Sky -> Deep Ocean Blue
+    '#10b981': '#059669', // Emerald -> Deep Emerald
+    '#f59e0b': '#d97706', // Amber -> Deep Amber
+    '#a855f7': '#7e22ce', // Purple -> Deep Violet
+    '#ec4899': '#db2777', // Pink -> Deep Rose
+    '#f87171': '#dc2626', // Light Red -> Crisp Crimson
+    '#ef4444': '#dc2626', // Red -> Crisp Crimson
+    '#84cc16': '#4d7c0f', // Lime -> Deep Olive Green
+    '#f97316': '#ea580c', // Orange -> Deep Burnt Orange
+    '#8b5cf6': '#6d28d9', // Indigo-Violet -> Deep Indigo
+  };
+
+  if (theme === 'dark') {
+    const needsWhiteOnDarkBanner = [
+      '#ef4444',
+      '#dc2626',
+      '#f87171',
+      '#a855f7',
+      '#ec4899',
+      '#8b5cf6',
+    ].includes(normalized);
+    return {
+      fg: hexColor,
+      bgSoft: `${hexColor}22`,
+      bannerBg: hexColor,
+      bannerFg: needsWhiteOnDarkBanner ? '#ffffff' : '#020617',
+    };
+  }
+
+  const deepColor = lightModeShadeMap[normalized] || '#0284c7';
+  return {
+    fg: deepColor,
+    bgSoft: `${deepColor}18`,
+    bannerBg: deepColor,
+    bannerFg: '#ffffff',
+  };
+}
+
+/**
+ * Clamps window scrollTop to the active Viewing Area collapse range [0, maxThreshold]
+ * so scrolling deeper in the page triggers zero unnecessary React state re-renders on low-end devices.
+ */
+export function clampViewingAreaScroll(
+  scrollTop: number,
+  maxThreshold: number = 120
+): number {
+  const safeMax = Math.max(20, maxThreshold);
+  if (!Number.isFinite(scrollTop) || scrollTop <= 0) return 0;
+  if (scrollTop >= safeMax) return safeMax;
+  return Math.round(scrollTop);
+}
+
+export type EfficiencyOverrideMode = 'auto' | 'enabled' | 'disabled';
+
+export interface HardwareEfficiencyInput {
+  hardwareConcurrency?: number;
+  deviceMemory?: number;
+  prefersReducedMotion?: boolean;
+  saveData?: boolean;
+  userOverride?: EfficiencyOverrideMode;
+}
+
+/**
+ * Determines whether Low-End Device Efficiency Mode should be active.
+ * Automatically activates on <= 4 CPU cores, <= 4 GB RAM, Data Saver, or Reduced Motion,
+ * while respecting manual user override ('auto' | 'enabled' | 'disabled').
+ */
+export function shouldEnableLowEndEfficiency(
+  input: HardwareEfficiencyInput
+): boolean {
+  if (input.userOverride === 'enabled') return true;
+  if (input.userOverride === 'disabled') return false;
+  if (input.prefersReducedMotion || input.saveData) return true;
+  if (typeof input.deviceMemory === 'number' && input.deviceMemory <= 4) {
+    return true;
+  }
+  if (
+    typeof input.hardwareConcurrency === 'number' &&
+    input.hardwareConcurrency <= 4
+  ) {
+    return true;
+  }
+  return false;
+}
+
+

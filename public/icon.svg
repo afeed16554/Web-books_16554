@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="86" y="76" width="340" height="360" rx="44" fill="#121218" stroke="#27272f" stroke-width="8"/>
+  <path d="M86 120 C86 95.699 105.699 76 130 76 H382 C406.301 76 426 95.699 426 120 V158 H86 V120 Z" fill="url(#accent)"/>
+  <circle cx="146" cy="117" r="12" fill="#020617"/>
+  <rect x="176" y="109" width="130" height="16" rx="8" fill="#020617"/>
+  <rect x="128" y="206" width="210" height="20" rx="10" fill="#f8fafc"/>
+  <rect x="128" y="246" width="256" height="14" rx="7" fill="#94a3b8"/>
+  <rect x="128" y="278" width="230" height="14" rx="7" fill="#94a3b8"/>
+  <polygon points="256,322 292,342 292,382 256,402 220,382 220,342" fill="none" stroke="#38bdf8" stroke-width="10"/>
+  <circle cx="256" cy="362" r="14" fill="none" stroke="#38bdf8" stroke-width="6"/>
+</svg>

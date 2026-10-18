@@ -28,15 +28,21 @@ import {
   BUILT_IN_PAGES,
   buildFolderHierarchy,
   ChapterItem,
+  clampViewingAreaScroll,
+  computeViewingAreaCollapseState,
+  detectDeviceFormFactor,
+  EfficiencyOverrideMode,
   extractMainTopicsFromHtml,
   FolderNode,
   formatCleanReaderHeader,
   getChaptersForSubjectPaper,
   getSubjectPaperCards,
+  getThemeAwareAccentPair,
   isAuthorizedAdminEmail,
   LibraryTopicPage,
   normalizeClassName,
   PRIMARY_ADMIN_EMAIL,
+  shouldEnableLowEndEfficiency,
   SubjectPaperCard,
 } from './utils/libraryCatalog';
 import {
@@ -56,6 +62,12 @@ declare global {
     togglePanel?: (panelId: string) => void;
   }
 }
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 type ThemeMode = 'dark' | 'yellow' | 'light';
 type ViewMode = 'home' | 'reader';
 type HomeDrillStage = 'subjects' | 'chapters' | 'topics';
@@ -79,6 +91,7 @@ const LOCAL_STUDENT_CLASS_KEY = 'organic_note_student_class_v1';
 const LOCAL_STUDENT_SCHOOL_KEY = 'organic_note_student_school_v1';
 const LOCAL_STUDENT_PHONE_KEY = 'organic_note_student_phone_v1';
 const LOCAL_ADMIN_EMAILS_KEY = 'organic_note_selective_admins_v1';
+const LOCAL_EFFICIENCY_MODE_KEY = 'web_books_efficiency_mode_v1';
 
 /**
  * Custom Sidebar Toggle Icon:
@@ -146,7 +159,7 @@ function QuickTopicContentIcon({
 /**
  * Filled Folder Icon
  */
-function SamsungFolderIcon({
+function FolderIcon({
   color = '#38bdf8',
   className = 'w-5 h-5 shrink-0',
 }: {
@@ -207,7 +220,7 @@ function StarIcon({
 }
 
 export default function App() {
-  // View state: 'home' (One UI Progressive Drill-Down) or 'reader' (Clean textbook reader)
+  // View state: 'home' (Progressive Drill-Down) or 'reader' (Clean textbook reader)
   const [viewMode, setViewMode] = useState<ViewMode>('home');
   // 3-Stage Home Drill-Down: 'subjects' -> 'chapters' -> 'topics' (expanded chapter page)
   const [homeStage, setHomeStage] = useState<HomeDrillStage>('subjects');
@@ -368,16 +381,161 @@ export default function App() {
 
   const readerContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Collapsible Viewing Area scroll & manual collapse tracking
+  const [scrollY, setScrollY] = useState<number>(0);
+  const [manualViewingCollapsed, setManualViewingCollapsed] =
+    useState<boolean>(false);
+  const viewingCollapse = useMemo(() => {
+    if (manualViewingCollapsed) {
+      return computeViewingAreaCollapseState(150, 110);
+    }
+    return computeViewingAreaCollapseState(scrollY, 110);
+  }, [scrollY, manualViewingCollapsed]);
+
+  // Low-End Device Efficiency Mode ('auto' | 'enabled' | 'disabled')
+  const [efficiencyMode, setEfficiencyMode] = useState<EfficiencyOverrideMode>(
+    () => {
+      try {
+        const saved = localStorage.getItem(LOCAL_EFFICIENCY_MODE_KEY);
+        if (saved === 'auto' || saved === 'enabled' || saved === 'disabled') {
+          return saved;
+        }
+      } catch {
+        // ignore storage errors
+      }
+      return 'auto';
+    }
+  );
+
+  const isLowEndEfficiencyActive = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const nav = window.navigator as Navigator & {
+      deviceMemory?: number;
+      connection?: { saveData?: boolean };
+    };
+    const prefersReducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return shouldEnableLowEndEfficiency({
+      hardwareConcurrency: nav.hardwareConcurrency,
+      deviceMemory: nav.deviceMemory,
+      prefersReducedMotion,
+      saveData: nav.connection?.saveData,
+      userOverride: efficiencyMode,
+    });
+  }, [efficiencyMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_EFFICIENCY_MODE_KEY, efficiencyMode);
+    } catch {
+      // ignore storage errors
+    }
+    document.documentElement.setAttribute(
+      'data-efficiency',
+      isLowEndEfficiencyActive ? 'low-end' : 'standard'
+    );
+  }, [efficiencyMode, isLowEndEfficiencyActive]);
+
+  // Adaptive Form Factor detection (Phone, Passport Foldable, Tablet/Book Foldable, DeX / Desktop PC)
+  const [viewportSize, setViewportSize] = useState<{
+    width: number;
+    height: number;
+  }>(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
+
+  const deviceProfile = useMemo(
+    () => detectDeviceFormFactor(viewportSize.width, viewportSize.height),
+    [viewportSize.width, viewportSize.height]
+  );
+
+  // Adaptive grid columns helper for Passport Foldables, Tablets, Phones, and DeX / Desktop PC
+  const adaptiveHomeGridClass = useMemo(() => {
+    if (deviceProfile.formFactor === 'passport-foldable') {
+      return 'grid grid-cols-2 gap-3.5';
+    }
+    if (deviceProfile.formFactor === 'phone') {
+      return 'grid grid-cols-1 gap-3.5';
+    }
+    if (deviceProfile.formFactor === 'tablet-foldable') {
+      return 'grid grid-cols-2 lg:grid-cols-3 gap-4';
+    }
+    return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4';
+  }, [deviceProfile.formFactor]);
+
+  // PWA Install Prompt & copy status states
+  const [deferredInstallPrompt, setDeferredInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalledPWA, setIsInstalledPWA] = useState<boolean>(false);
+  const [domainCopied, setDomainCopied] = useState<boolean>(false);
+  const [copiedCmd, setCopiedCmd] = useState<string>('');
+
+  // rAF-throttled & clamped scroll listener:
+  // Only updates state within the top [0, 120px] collapse range in Home mode,
+  // preventing unnecessary React re-renders during deep page scrolling on low-end devices.
+  useEffect(() => {
+    if (viewMode !== 'home') return;
+    let rafId: number | null = null;
+    const handleScroll = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const rawTop =
+          window.scrollY || document.documentElement.scrollTop || 0;
+        const clamped = clampViewingAreaScroll(rawTop, 120);
+        setScrollY((prev) => (prev === clamped ? prev : clamped));
+      });
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [viewMode]);
+
+  useEffect(() => {
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone ===
+        true;
+    setIsInstalledPWA(isStandalone);
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+    const handleInstalled = () => {
+      setIsInstalledPWA(true);
+      setDeferredInstallPrompt(null);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
   // Automatically close Quick Topic popover whenever leaving the content reader
   useEffect(() => {
     if (viewMode !== 'reader') {
       setQuickTopicOpen(false);
     }
-  }, [viewMode]);
+    setScrollY(0);
+  }, [viewMode, homeStage]);
 
-  // Responsive sidebar auto-collapse when resizing to mobile width
+  // Responsive sidebar & form factor tracking on resize
   useEffect(() => {
     const handleResize = () => {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
       if (window.innerWidth < 768) {
         setSidebarOpen(false);
       }
@@ -1096,8 +1254,8 @@ export default function App() {
                   <span className="w-1 h-1 rounded-full bg-current opacity-50" />
                 )}
               </span>
-              <SamsungFolderIcon
-                color={node.color}
+              <FolderIcon
+                color={getThemeAwareAccentPair(node.color, theme).fg}
                 className="w-4 h-4 shrink-0"
               />
               <span className="truncate font-medium">{node.name}</span>
@@ -1147,9 +1305,8 @@ export default function App() {
   };
 
   // Clean header title:
-  // Clean header title:
   // In Reader mode: ONLY "Chapter Name : Topic Name"
-  // In Home mode: Reflects the active One UI stage ("Web Books", "Chemistry 2nd Paper", or "2nd Chapter: Organic Chemistry")
+  // In Home mode: Reflects the active stage ("Web Books", "Chemistry 2nd Paper", or "2nd Chapter: Organic Chemistry")
   const headerDisplayTitle = useMemo(() => {
     if (viewMode === 'reader') {
       return formatCleanReaderHeader(activePage.chapter, activePage.title);
@@ -1199,7 +1356,7 @@ export default function App() {
     selectedPaper,
   ]);
 
-  // Step-by-step Back button handler for One UI hierarchical navigation
+  // Step-by-step Back button handler for hierarchical navigation
   const handleHeaderBack = () => {
     if (viewMode === 'reader') {
       setSelectedClass(activePage.className);
@@ -1229,43 +1386,47 @@ export default function App() {
     homeStage === 'topics';
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg-primary)] text-[var(--text-main)] relative overflow-x-hidden">
+    <div
+      data-form-factor={deviceProfile.formFactor}
+      data-efficiency={isLowEndEfficiencyActive ? 'low-end' : 'standard'}
+      className="min-h-screen flex bg-[var(--bg-primary)] text-[var(--text-main)] relative overflow-x-clip"
+    >
       {/* Mobile Backdrop when Sidebar is open on small screens */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
-          className="fixed inset-0 bg-black/60 backdrop-blur-[1px] z-30 md:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-black/60 backdrop-blur-[1px] z-30 md:hidden transition-opacity duration-200"
         />
       )}
 
       {/* =====================================================================
           WEB BOOKS SIDEBAR (All Notes + All Classes 1-8, 9-10 SSC, 11-12 HSC)
+          Uses .wb-sidebar + fixed-width .wb-sidebar-inner for 60fps/120fps
+          GPU-accelerated open/close transitions without internal text reflow!
          ===================================================================== */}
       <aside
         aria-label="Web Books Navigation Sidebar"
-        className={`smooth-sidebar ${
-          sidebarOpen
-            ? 'w-72 border-r border-[var(--border)] opacity-100 translate-x-0'
-            : 'w-0 border-r-0 opacity-0 -translate-x-4 pointer-events-none'
-        } shrink-0 bg-[var(--bg-card)] overflow-hidden flex flex-col fixed md:sticky top-0 h-screen z-40`}
+        data-testid="wb-sidebar"
+        className={`wb-sidebar ${sidebarOpen ? 'is-open' : 'is-closed'}`}
       >
-        {/* Top Row of Sidebar: "Web Books / by Afeed" + Settings Gear at top-right */}
-        <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between shrink-0 border-b border-[var(--border)]/50">
-          <div className="flex flex-col leading-tight select-none">
-            <span
-              data-testid="brand-title"
-              className="text-sm font-bold tracking-tight text-[var(--text-main)]"
-            >
-              Web Books
-            </span>
-            <span
-              data-testid="brand-subtitle"
-              className="text-[11px] font-medium text-[var(--text-muted)] opacity-55"
-            >
-              by Afeed
-            </span>
-          </div>
+        <div className="wb-sidebar-inner">
+          {/* Top Row of Sidebar: "Web Books / by Afeed" + Settings Gear at top-right */}
+          <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between shrink-0 border-b border-[var(--border)]/50">
+            <div className="flex flex-col leading-tight select-none">
+              <span
+                data-testid="brand-title"
+                className="text-sm font-bold tracking-tight text-[var(--text-main)]"
+              >
+                Web Books
+              </span>
+              <span
+                data-testid="brand-subtitle"
+                className="text-[11px] font-medium text-[var(--text-muted)] opacity-55"
+              >
+                by Afeed
+              </span>
+            </div>
           <button
             type="button"
             onClick={() => {
@@ -1349,8 +1510,8 @@ export default function App() {
               }`}
             >
               <span className="flex items-center gap-2.5 truncate">
-                <SamsungFolderIcon
-                  color="#38bdf8"
+                <FolderIcon
+                  color={getThemeAwareAccentPair('#38bdf8', theme).fg}
                   className="w-4 h-4 shrink-0"
                 />
                 <span className="truncate">My Class: {studentClass}</span>
@@ -1430,7 +1591,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setUploadModalOpen(true)}
-                className="flex-1 py-2 px-2.5 rounded-lg bg-[var(--accent)] text-slate-950 font-bold text-xs text-center hover:opacity-90 transition-opacity whitespace-nowrap"
+                className="flex-1 py-2 px-2.5 rounded-lg btn-accent text-xs text-center whitespace-nowrap"
               >
                 + New Topic Page
               </button>
@@ -1445,10 +1606,11 @@ export default function App() {
             </div>
           )}
         </div>
+        </div>
       </aside>
 
       {/* =====================================================================
-          MAIN WORKSPACE (SAMSUNG ONE UI VIEWING AREA + INTERACTION AREA)
+          MAIN WORKSPACE (COLLAPSIBLE VIEWING AREA + INTERACTION AREA)
           Automatically expands to fill 100% of viewport width when Sidebar closes!
          ===================================================================== */}
       <div className="flex-1 min-w-0 w-full flex flex-col smooth-workspace">
@@ -1457,8 +1619,15 @@ export default function App() {
             Right Corner:
               - Quick Topic Content Button (ONLY in Reader mode — never outside of content!)
               - Search Button (with Filters) */}
-        <header className="sticky top-0 z-30 h-14 px-4 sm:px-6 bg-[var(--bg-primary)]/90 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between gap-3">
-          {/* Left Zone: Sidebar Toggle + Step-Back Button + Clean Title */}
+        <header
+          data-testid="wb-sticky-header"
+          className={`sticky top-0 z-30 h-14 px-4 sm:px-6 bg-[var(--bg-primary)]/92 backdrop-blur-md flex items-center justify-between gap-3 transition-all duration-200 ${
+            viewMode === 'reader' || viewingCollapse.isCollapsed
+              ? 'border-b border-[var(--border)] shadow-xs'
+              : 'border-b border-transparent'
+          }`}
+        >
+          {/* Left Zone: Sidebar Toggle + Step-Back Button + Clean Title (Cross-fades in as Viewing Area collapses on scroll) */}
           <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
@@ -1503,7 +1672,26 @@ export default function App() {
               </button>
             )}
 
-            <div className="flex items-baseline gap-1.5 min-w-0">
+            <div
+              className="flex items-baseline gap-1.5 min-w-0 transition-all duration-200"
+              style={
+                viewMode === 'home'
+                  ? {
+                      opacity: viewingCollapse.isCollapsed
+                        ? 1
+                        : viewingCollapse.compactHeaderTitleOpacity,
+                      transform: `translateY(${
+                        viewingCollapse.isCollapsed
+                          ? 0
+                          : Math.round(
+                              (1 - viewingCollapse.compactHeaderTitleOpacity) *
+                                6
+                            )
+                      }px)`,
+                    }
+                  : undefined
+              }
+            >
               <h1
                 data-testid="clean-header-title"
                 className="text-sm sm:text-base font-bold truncate"
@@ -1512,15 +1700,68 @@ export default function App() {
                 {headerDisplayTitle}
               </h1>
               {viewMode === 'home' && homeStage === 'subjects' && (
-                <span className="text-[11px] font-medium text-[var(--text-muted)] opacity-55 shrink-0 hidden sm:inline select-none">
+                <span className="text-[11px] font-medium text-[var(--text-muted)] opacity-60 shrink-0 hidden sm:inline select-none">
                   by Afeed
                 </span>
               )}
             </div>
           </div>
 
-          {/* Right Corner Zone: Quick Topic Content Button (ONLY inside Reader content) + Search Button */}
+          {/* Right Corner Zone: Adaptive Form-Factor Badge + Viewing Area Collapse Toggle + Quick Topic Content Button (ONLY inside Reader content) + Search Button */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Adaptive Form-Factor Indicator Badge (DeX / Foldable / Tablet / Phone) */}
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsTab('display');
+                setSettingsOpen(true);
+              }}
+              data-testid="adaptive-form-factor-badge"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] transition-colors"
+              title={`Adaptive Layout: ${deviceProfile.label} (${viewportSize.width}×${viewportSize.height})`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+              <span>{deviceProfile.label}</span>
+            </button>
+
+            {/* Viewing Area Collapse / Expand Toggle Button (in Home Mode) */}
+            {viewMode === 'home' && (
+              <button
+                type="button"
+                onClick={() => setManualViewingCollapsed((prev) => !prev)}
+                aria-label={
+                  viewingCollapse.isCollapsed
+                    ? 'Expand Viewing Area'
+                    : 'Collapse Viewing Area'
+                }
+                data-testid="toggle-viewing-area-btn"
+                className={`p-2 rounded-xl border transition-all duration-200 ${
+                  manualViewingCollapsed
+                    ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-transparent hover:bg-[var(--surface-subtle)]'
+                }`}
+                title={
+                  viewingCollapse.isCollapsed
+                    ? 'Expand Viewing Area'
+                    : 'Collapse Viewing Area'
+                }
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    viewingCollapse.isCollapsed ? 'rotate-180' : ''
+                  }`}
+                >
+                  <polyline points="18 15 12 9 6 15" />
+                </svg>
+              </button>
+            )}
+
             {viewMode === 'reader' && (
               <button
                 type="button"
@@ -1773,7 +2014,7 @@ export default function App() {
         )}
 
         {/* =====================================================================
-            SAMSUNG ONE UI HOME FLOW:
+            PROGRESSIVE HOME FLOW:
             - Stage 1: 'subjects' (Viewing Area + Subject Cards Grid)
             - Stage 2: 'chapters' (Viewing Area + Chapters of Selected Subject)
             - Stage 3: 'topics'   (Viewing Area + Expanded Chapter Topics & Sections)
@@ -1783,7 +2024,18 @@ export default function App() {
             {/* If user typed a live search query, show instant Search Results Focus Block */}
             {searchQuery.trim() !== '' ? (
               <div>
-                <section className="oneui-viewing-area">
+                <section
+                  data-collapsed={viewingCollapse.isCollapsed}
+                  className={`wb-viewing-area ${
+                    viewingCollapse.isCollapsed ? 'is-collapsed' : ''
+                  }`}
+                  style={{
+                    opacity: viewingCollapse.viewingAreaOpacity,
+                    transform: `translateY(-${Math.round(
+                      viewingCollapse.collapseProgress * 18
+                    )}px) scale(${viewingCollapse.viewingAreaScale})`,
+                  }}
+                >
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
                     Search Results
                   </h2>
@@ -1792,8 +2044,8 @@ export default function App() {
                     {filteredPages.length})
                   </p>
                 </section>
-                <section className="oneui-interaction-area space-y-4">
-                  <div className="oneui-focus-block">
+                <section className="wb-interaction-area space-y-4">
+                  <div className="wb-focus-block">
                     {filteredPages.length === 0 ? (
                       <div className="p-8 text-center text-xs text-[var(--text-muted)]">
                         No matching topics found. Try searching for
@@ -1810,7 +2062,7 @@ export default function App() {
                             setViewMode('reader');
                             autoCloseSidebarOnMobile();
                           }}
-                          className="oneui-list-row"
+                          className="wb-list-row"
                         >
                           <div className="min-w-0">
                             <div className="text-sm font-bold truncate">
@@ -1832,24 +2084,36 @@ export default function App() {
             ) : (
               <>
                 {/* ===============================================================
-                    STAGE 1: ONE UI SUBJECTS VIEW (homeStage === 'subjects')
+                    STAGE 1: SUBJECTS VIEW (homeStage === 'subjects')
                     Tapping any Subject + Paper opens its Chapters view!
                    =============================================================== */}
                 {homeStage === 'subjects' && (
                   <div
-                    data-testid="oneui-stage-subjects"
+                    data-testid="wb-stage-subjects"
                     className="view-transition-enter"
                   >
-                    {/* ONE UI VIEWING AREA (Top of screen: wide margins, center-aligned, non-interactive) */}
+                    {/* COLLAPSIBLE VIEWING AREA (Collapses smoothly when scrolling down or toggled) */}
                     <section
                       aria-label="Viewing Area"
-                      className="oneui-viewing-area"
+                      data-testid="wb-collapsible-viewing-area"
+                      data-collapsed={viewingCollapse.isCollapsed}
+                      className={`wb-viewing-area ${
+                        viewingCollapse.isCollapsed ? 'is-collapsed' : ''
+                      } ${
+                        manualViewingCollapsed ? 'is-manually-collapsed' : ''
+                      }`}
+                      style={{
+                        opacity: viewingCollapse.viewingAreaOpacity,
+                        transform: `translateY(-${Math.round(
+                          viewingCollapse.collapseProgress * 18
+                        )}px) scale(${viewingCollapse.viewingAreaScale})`,
+                      }}
                     >
                       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
                         Web Books
                       </h2>
                       <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
-                        <span className="text-xs sm:text-sm font-medium text-[var(--text-muted)] opacity-60">
+                        <span className="text-xs sm:text-sm font-medium text-[var(--text-muted)] opacity-70">
                           by Afeed
                         </span>
                         {effectiveHomeClassFilter !== 'ALL' && (
@@ -1858,20 +2122,21 @@ export default function App() {
                           </span>
                         )}
                         {schoolName && (
-                          <span className="text-xs text-[var(--text-muted)] opacity-65 truncate max-w-xs">
+                          <span className="text-xs text-[var(--text-muted)] opacity-70 truncate max-w-xs">
                             · {schoolName}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-[var(--text-muted)] opacity-70 mt-1">
-                        Select a subject to view its chapters
+                      <p className="text-xs text-[var(--text-muted)] opacity-75 mt-1">
+                        {subjectPaperCards.length} Subjects — Select a subject
+                        to view its chapters
                       </p>
                     </section>
 
-                    {/* ONE UI INTERACTION AREA (24dp keyline margins + 26px Focus Block Card Grid) */}
+                    {/* INTERACTION AREA (24dp keyline margins + Adaptive Multi-Form-Factor Grid) */}
                     <section
                       aria-label="Subject Folders Interaction Area"
-                      className="oneui-interaction-area space-y-4"
+                      className="wb-interaction-area space-y-4"
                     >
                       <div className="flex items-center justify-between px-1">
                         <span className="text-xs font-semibold text-[var(--text-muted)]">
@@ -1890,85 +2155,103 @@ export default function App() {
 
                       <div
                         data-testid="home-subject-paper-grid"
-                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                        className={adaptiveHomeGridClass}
                       >
-                        {subjectPaperCards.map((card: SubjectPaperCard) => (
-                          <button
-                            key={card.id}
-                            type="button"
-                            data-testid={`subject-card-${card.id}`}
-                            onClick={() =>
-                              goToChaptersStage(
-                                card.className,
-                                card.subject,
-                                card.paper
-                              )
-                            }
-                            className="oneui-focus-card group min-h-[138px] text-left flex flex-col justify-between"
-                          >
-                            {/* Top Row: Folder Container Icon + Unboxed Chapter & Note Metadata */}
-                            <div className="w-full flex items-start justify-between gap-3">
-                              <div
-                                className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0"
-                                style={{ backgroundColor: `${card.color}1F` }}
-                              >
-                                <SamsungFolderIcon
-                                  color={card.color}
-                                  className="w-6 h-6"
-                                />
+                        {subjectPaperCards.map((card: SubjectPaperCard) => {
+                          const accentPair = getThemeAwareAccentPair(
+                            card.color,
+                            theme
+                          );
+                          return (
+                            <button
+                              key={card.id}
+                              type="button"
+                              data-testid={`subject-card-${card.id}`}
+                              onClick={() =>
+                                goToChaptersStage(
+                                  card.className,
+                                  card.subject,
+                                  card.paper
+                                )
+                              }
+                              className="wb-focus-card group min-h-[138px] text-left flex flex-col justify-between"
+                            >
+                              {/* Top Row: Folder Container Icon + Unboxed Chapter & Note Metadata */}
+                              <div className="w-full flex items-start justify-between gap-3">
+                                <div
+                                  className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0"
+                                  style={{ backgroundColor: accentPair.bgSoft }}
+                                >
+                                  <FolderIcon
+                                    color={accentPair.fg}
+                                    className="w-6 h-6"
+                                  />
+                                </div>
+                                <div className="text-right text-xs text-[var(--text-muted)] tabular-nums">
+                                  <span className="font-semibold text-[var(--text-main)]">
+                                    {card.chapterCount}{' '}
+                                    {card.chapterCount === 1
+                                      ? 'chapter'
+                                      : 'chapters'}
+                                  </span>
+                                  {card.count > 0 && (
+                                    <>
+                                      <span aria-hidden="true"> · </span>
+                                      <span className="text-[var(--accent)] font-semibold">
+                                        {card.count}{' '}
+                                        {card.count === 1 ? 'topic' : 'topics'}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-right text-xs text-[var(--text-muted)] tabular-nums">
-                                <span className="font-semibold text-[var(--text-main)]">
-                                  {card.chapterCount}{' '}
-                                  {card.chapterCount === 1
-                                    ? 'chapter'
-                                    : 'chapters'}
-                                </span>
-                                {card.count > 0 && (
-                                  <>
-                                    <span aria-hidden="true"> · </span>
-                                    <span className="text-[var(--accent)] font-semibold">
-                                      {card.count}{' '}
-                                      {card.count === 1 ? 'topic' : 'topics'}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
 
-                            {/* Bottom Row: Subject + Paper Name & Class */}
-                            <div className="pt-4 space-y-0.5 w-full">
-                              <div className="text-sm sm:text-base font-bold leading-snug truncate group-hover:text-[var(--accent)] transition-colors">
-                                {card.displayName}
+                              {/* Bottom Row: Subject + Paper Name & Class */}
+                              <div className="pt-4 space-y-0.5 w-full">
+                                <div className="text-sm sm:text-base font-bold leading-snug truncate group-hover:text-[var(--accent)] transition-colors">
+                                  {card.displayName}
+                                </div>
+                                <div className="text-xs text-[var(--text-muted)] truncate flex items-center justify-between">
+                                  <span>{card.className}</span>
+                                  <span className="text-[var(--accent)] font-medium group-hover:translate-x-0.5 transition-transform">
+                                    Open Chapters →
+                                  </span>
+                                </div>
                               </div>
-                              <div className="text-xs text-[var(--text-muted)] truncate flex items-center justify-between">
-                                <span>{card.className}</span>
-                                <span className="text-[var(--accent)] opacity-80 group-hover:translate-x-0.5 transition-transform">
-                                  Open Chapters →
-                                </span>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     </section>
                   </div>
                 )}
 
                 {/* ===============================================================
-                    STAGE 2: ONE UI CHAPTERS VIEW (homeStage === 'chapters')
+                    STAGE 2: CHAPTERS VIEW (homeStage === 'chapters')
                     Opened after tapping a Subject (e.g., Chemistry 2nd Paper).
                     Tapping a Chapter opens the Expanded Chapter Topics view!
                    =============================================================== */}
                 {homeStage === 'chapters' && (
                   <div
-                    data-testid="oneui-stage-chapters"
+                    data-testid="wb-stage-chapters"
                     className="view-transition-enter"
                   >
-                    {/* ONE UI VIEWING AREA */}
+                    {/* COLLAPSIBLE VIEWING AREA */}
                     <section
                       aria-label="Subject Viewing Area"
-                      className="oneui-viewing-area"
+                      data-testid="wb-collapsible-viewing-area"
+                      data-collapsed={viewingCollapse.isCollapsed}
+                      className={`wb-viewing-area ${
+                        viewingCollapse.isCollapsed ? 'is-collapsed' : ''
+                      } ${
+                        manualViewingCollapsed ? 'is-manually-collapsed' : ''
+                      }`}
+                      style={{
+                        opacity: viewingCollapse.viewingAreaOpacity,
+                        transform: `translateY(-${Math.round(
+                          viewingCollapse.collapseProgress * 18
+                        )}px) scale(${viewingCollapse.viewingAreaScale})`,
+                      }}
                     >
                       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
                         {selectedSubject}{' '}
@@ -1986,47 +2269,60 @@ export default function App() {
                       </p>
                     </section>
 
-                    {/* ONE UI INTERACTION AREA */}
+                    {/* INTERACTION AREA */}
                     <section
                       aria-label="Chapters Interaction Area"
-                      className="oneui-interaction-area space-y-5"
+                      className="wb-interaction-area space-y-5"
                     >
-                      {/* One UI Breadcrumb / Action Bar */}
-                      <div className="flex items-center justify-between gap-2 px-1">
+                      {/* Pill Breadcrumb Bar */}
+                      <div className="wb-breadcrumb-pill">
                         <nav
                           aria-label="Breadcrumb"
-                          className="flex items-center gap-2 text-xs text-[var(--text-muted)]"
+                          className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)] min-w-0"
                         >
                           <button
                             type="button"
                             onClick={() => goToSubjectsStage(selectedClass)}
-                            className="hover:text-[var(--accent)] font-medium transition-colors"
+                            className="hover:text-[var(--accent)] font-medium transition-colors inline-flex items-center gap-1.5"
                           >
-                            All Subjects
+                            <span>⌂</span>
+                            <span>All Subjects</span>
                           </button>
-                          <span aria-hidden="true">/</span>
-                          <span className="text-[var(--text-main)] font-semibold">
-                            {selectedSubject}{' '}
-                            {selectedPaper !== 'ALL' ? selectedPaper : ''}
+                          <span aria-hidden="true">›</span>
+                          <span className="text-[var(--text-main)] font-semibold inline-flex items-center gap-1.5 truncate">
+                            <FolderIcon
+                              color={
+                                getThemeAwareAccentPair('#10b981', theme).fg
+                              }
+                              className="w-3.5 h-3.5 shrink-0"
+                            />
+                            <span>
+                              {selectedSubject}{' '}
+                              {selectedPaper !== 'ALL' ? selectedPaper : ''}
+                            </span>
                           </span>
                         </nav>
 
                         <button
                           type="button"
                           onClick={() => goToSubjectsStage(selectedClass)}
-                          className="text-xs font-semibold text-[var(--accent)] hover:underline"
+                          className="text-xs font-semibold text-[var(--accent)] hover:underline shrink-0"
                         >
                           ← Back to Subjects
                         </button>
                       </div>
 
-                      {/* One UI 2-Column / 3-Column Card Grid Focus Block for Chapters */}
+                      {/* Adaptive Card Grid Focus Block for Chapters */}
                       <div
                         data-testid="chapters-card-grid"
-                        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+                        className={adaptiveHomeGridClass}
                       >
                         {chaptersForSelectedSubject.map((chap) => {
                           const hasReadyTopics = chap.pages.length > 0;
+                          const chapAccent = getThemeAwareAccentPair(
+                            chap.color,
+                            theme
+                          );
                           return (
                             <button
                               key={chap.id}
@@ -2035,14 +2331,14 @@ export default function App() {
                               onClick={() =>
                                 goToExpandedChapterStage(chap.chapterTitle)
                               }
-                              className="oneui-focus-card group min-h-[148px] text-left flex flex-col justify-between"
+                              className="wb-focus-card group min-h-[148px] text-left flex flex-col justify-between"
                             >
                               <div className="w-full flex items-start justify-between gap-3">
                                 <div
                                   className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0"
                                   style={{
-                                    backgroundColor: `${chap.color}1F`,
-                                    color: chap.color,
+                                    backgroundColor: chapAccent.bgSoft,
+                                    color: chapAccent.fg,
                                   }}
                                 >
                                   Ch {chap.chapterNumber}
@@ -2093,19 +2389,31 @@ export default function App() {
                 )}
 
                 {/* ===============================================================
-                    STAGE 3: ONE UI EXPANDED CHAPTER TOPICS PAGE (homeStage === 'topics')
+                    STAGE 3: EXPANDED CHAPTER TOPICS PAGE (homeStage === 'topics')
                     Opened after tapping a Chapter (e.g., 2nd Chapter: Organic Chemistry).
                     Tapping a Topic opens the distraction-free Reader!
                    =============================================================== */}
                 {homeStage === 'topics' && activeExpandedChapter && (
                   <div
-                    data-testid="oneui-stage-topics"
+                    data-testid="wb-stage-topics"
                     className="view-transition-enter"
                   >
-                    {/* ONE UI VIEWING AREA */}
+                    {/* COLLAPSIBLE VIEWING AREA */}
                     <section
                       aria-label="Chapter Viewing Area"
-                      className="oneui-viewing-area"
+                      data-testid="wb-collapsible-viewing-area"
+                      data-collapsed={viewingCollapse.isCollapsed}
+                      className={`wb-viewing-area ${
+                        viewingCollapse.isCollapsed ? 'is-collapsed' : ''
+                      } ${
+                        manualViewingCollapsed ? 'is-manually-collapsed' : ''
+                      }`}
+                      style={{
+                        opacity: viewingCollapse.viewingAreaOpacity,
+                        transform: `translateY(-${Math.round(
+                          viewingCollapse.collapseProgress * 18
+                        )}px) scale(${viewingCollapse.viewingAreaScale})`,
+                      }}
                     >
                       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight max-w-2xl">
                         {activeExpandedChapter.chapterTitle}
@@ -2113,30 +2421,34 @@ export default function App() {
                       <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5 max-w-xl">
                         {activeExpandedChapter.subject}{' '}
                         {activeExpandedChapter.paper} ·{' '}
-                        {activeExpandedChapter.className} — Tap a topic below to
-                        read
+                        {activeExpandedChapter.className} —{' '}
+                        {activeExpandedChapter.pages.length}{' '}
+                        {activeExpandedChapter.pages.length === 1
+                          ? 'note'
+                          : 'notes'}
                       </p>
                     </section>
 
-                    {/* ONE UI INTERACTION AREA */}
+                    {/* INTERACTION AREA */}
                     <section
                       aria-label="Expanded Chapter Topics Interaction Area"
-                      className="oneui-interaction-area space-y-6"
+                      className="wb-interaction-area space-y-6"
                     >
-                      {/* One UI Breadcrumb / Navigation Bar */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                      {/* Pill Breadcrumb Bar */}
+                      <div className="wb-breadcrumb-pill">
                         <nav
                           aria-label="Chapter Breadcrumb"
-                          className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]"
+                          className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)] min-w-0"
                         >
                           <button
                             type="button"
                             onClick={() => goToSubjectsStage(selectedClass)}
-                            className="hover:text-[var(--accent)] font-medium transition-colors"
+                            className="hover:text-[var(--accent)] font-medium transition-colors inline-flex items-center gap-1"
                           >
-                            All Subjects
+                            <span>⌂</span>
+                            <span>All Subjects</span>
                           </button>
-                          <span aria-hidden="true">/</span>
+                          <span aria-hidden="true">›</span>
                           <button
                             type="button"
                             onClick={() =>
@@ -2151,9 +2463,20 @@ export default function App() {
                             {activeExpandedChapter.subject}{' '}
                             {activeExpandedChapter.paper}
                           </button>
-                          <span aria-hidden="true">/</span>
-                          <span className="text-[var(--text-main)] font-semibold">
-                            {activeExpandedChapter.chapterTitle}
+                          <span aria-hidden="true">›</span>
+                          <span className="text-[var(--text-main)] font-semibold inline-flex items-center gap-1.5 truncate">
+                            <FolderIcon
+                              color={
+                                getThemeAwareAccentPair(
+                                  activeExpandedChapter.color,
+                                  theme
+                                ).fg
+                              }
+                              className="w-3.5 h-3.5 shrink-0"
+                            />
+                            <span className="truncate">
+                              {activeExpandedChapter.chapterTitle}
+                            </span>
                           </span>
                         </nav>
 
@@ -2166,14 +2489,14 @@ export default function App() {
                               activeExpandedChapter.paper
                             )
                           }
-                          className="text-xs font-semibold text-[var(--accent)] hover:underline"
+                          className="text-xs font-semibold text-[var(--accent)] hover:underline shrink-0"
                         >
                           ← Back to Chapters
                         </button>
                       </div>
 
                       {activeExpandedChapter.pages.length === 0 ? (
-                        <div className="oneui-focus-block p-10 text-center space-y-3">
+                        <div className="wb-focus-block p-10 text-center space-y-3">
                           <div className="text-sm font-bold">
                             No topic notes uploaded in this chapter yet
                           </div>
@@ -2182,7 +2505,7 @@ export default function App() {
                             <strong>2nd Chapter: Organic Chemistry</strong> to
                             read <strong>Alkane, Alkene &amp; Alkyne</strong>.
                           </p>
-                          <div className="pt-1 flex items-center justify-center gap-3">
+                          <div className="pt-1 flex items-center justify-center gap-3 flex-wrap">
                             <button
                               type="button"
                               onClick={() =>
@@ -2206,7 +2529,7 @@ export default function App() {
                                   '2nd Chapter: Organic Chemistry'
                                 );
                               }}
-                              className="px-4 py-2 rounded-2xl bg-[var(--accent)] text-slate-950 text-xs font-bold"
+                              className="px-4 py-2 rounded-2xl btn-accent text-xs"
                             >
                               Open 2nd Chapter: Organic Chemistry
                             </button>
@@ -2214,7 +2537,7 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="space-y-6">
-                          {/* FOCUS BLOCK 1: Main Topic Book Card(s) in this Chapter */}
+                          {/* FOCUS BLOCK 1: Document Note Card(s) */}
                           <div className="space-y-2.5">
                             <div className="px-1 text-xs font-semibold text-[var(--text-muted)]">
                               Chapter Topic Books (
@@ -2223,57 +2546,77 @@ export default function App() {
                             <div
                               className={`grid gap-4 ${
                                 activeExpandedChapter.pages.length === 1
-                                  ? 'grid-cols-1'
-                                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                                  ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
                               }`}
                             >
-                              {activeExpandedChapter.pages.map((page) => (
-                                <button
-                                  key={page.id}
-                                  type="button"
-                                  data-testid={`topic-book-card-${page.id}`}
-                                  onClick={() => {
-                                    setActivePageId(page.id);
-                                    setViewMode('reader');
-                                    autoCloseSidebarOnMobile();
-                                    window.scrollTo({
-                                      top: 0,
-                                      behavior: 'smooth',
-                                    });
-                                  }}
-                                  className="oneui-focus-card group text-left flex flex-col justify-between min-h-[148px]"
-                                >
-                                  <div className="space-y-2.5 w-full">
-                                    <div className="flex items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
-                                      <span className="font-semibold text-[var(--accent)] truncate">
-                                        {page.chapter}
+                              {activeExpandedChapter.pages.map((page) => {
+                                const docAccent = getThemeAwareAccentPair(
+                                  page.folderColor || '#ef4444',
+                                  theme
+                                );
+                                return (
+                                  <button
+                                    key={page.id}
+                                    type="button"
+                                    data-testid={`topic-book-card-${page.id}`}
+                                    onClick={() => {
+                                      setActivePageId(page.id);
+                                      setViewMode('reader');
+                                      autoCloseSidebarOnMobile();
+                                      window.scrollTo({
+                                        top: 0,
+                                        behavior: 'smooth',
+                                      });
+                                    }}
+                                    className="wb-note-doc-card group text-left flex flex-col justify-between min-h-[188px]"
+                                  >
+                                    {/* Top High-Contrast Colored Banner */}
+                                    <div
+                                      className="w-full px-4 py-3 flex items-center justify-between"
+                                      style={{
+                                        backgroundColor: docAccent.bannerBg,
+                                        color: docAccent.bannerFg,
+                                      }}
+                                    >
+                                      <span className="text-[11px] font-bold tracking-wide uppercase truncate">
+                                        {page.subject} · {page.paper}
                                       </span>
-                                      <span className="shrink-0 tabular-nums">
-                                        {page.updatedDate}
+                                      <span className="px-2 py-0.5 rounded-md bg-black/15 text-[10px] font-bold tabular-nums">
+                                        {page.mainTopics.length} Topics
                                       </span>
                                     </div>
-                                    <div className="text-base sm:text-lg font-bold leading-snug group-hover:text-[var(--accent)] transition-colors">
-                                      {page.title}
-                                    </div>
-                                    <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                                      {page.subtitle}
-                                    </p>
-                                  </div>
 
-                                  <div className="pt-4 mt-3 border-t border-[var(--border)] w-full flex items-center justify-between text-xs">
-                                    <span className="text-[var(--text-muted)] tabular-nums">
-                                      {page.mainTopics.length} sections included
-                                    </span>
-                                    <span className="font-bold text-[var(--accent)] group-hover:translate-x-0.5 transition-transform">
-                                      Tap to Read →
-                                    </span>
-                                  </div>
-                                </button>
-                              ))}
+                                    {/* Clean Surface Body (White in Light Mode, #121215 in OLED Dark Mode) */}
+                                    <div className="p-4 flex-1 flex flex-col justify-between space-y-3 w-full">
+                                      <div className="space-y-1.5">
+                                        <div className="text-xs text-[var(--text-muted)] truncate">
+                                          {page.chapter}
+                                        </div>
+                                        <div className="text-base sm:text-lg font-bold leading-snug text-[var(--text-main)] group-hover:text-[var(--accent)] transition-colors">
+                                          {page.title}
+                                        </div>
+                                        <p className="text-xs text-[var(--text-muted)] line-clamp-2 leading-relaxed">
+                                          {page.subtitle}
+                                        </p>
+                                      </div>
+
+                                      <div className="pt-3 border-t border-[var(--border)] w-full flex items-center justify-between text-xs">
+                                        <span className="text-[var(--text-muted)] tabular-nums">
+                                          {page.updatedDate}
+                                        </span>
+                                        <span className="font-bold text-[var(--accent)] group-hover:translate-x-0.5 transition-transform">
+                                          Tap to Read →
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
 
-                          {/* FOCUS BLOCK 2: One UI Grouped List of Sections inside the Chapter */}
+                          {/* FOCUS BLOCK 2: Grouped List of Sections inside the Chapter */}
                           {activeExpandedChapter.pages.map((page) => (
                             <div key={`sections-${page.id}`} className="space-y-2.5">
                               <div className="px-1 flex items-center justify-between">
@@ -2296,7 +2639,7 @@ export default function App() {
 
                               <div
                                 data-testid="expanded-chapter-sections-list"
-                                className="oneui-focus-block"
+                                className="wb-focus-block"
                               >
                                 {page.mainTopics.map((sec, idx) => (
                                   <button
@@ -2305,7 +2648,7 @@ export default function App() {
                                     onClick={() =>
                                       handleSelectTopicSection(sec.id, page.id)
                                     }
-                                    className="oneui-list-row group"
+                                    className="wb-list-row group"
                                   >
                                     <div className="flex items-center gap-3.5 min-w-0">
                                       <span className="w-8 h-8 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] flex items-center justify-center text-xs font-bold text-[var(--accent)] shrink-0 tabular-nums">
@@ -2340,12 +2683,12 @@ export default function App() {
 
         {/* =====================================================================
             VIEW 2: FULL-WIDTH DISTRACTION-FREE READER
-            Respects One UI 24dp keyline margins and expands across 100% of available workspace!
+            Respects 24dp keyline margins and expands across 100% of available workspace!
            ===================================================================== */}
         {viewMode === 'reader' && (
           <main
             data-testid="reader-main-container"
-            className="flex-1 w-full max-w-none oneui-interaction-area pt-4 view-transition-enter"
+            className="flex-1 w-full max-w-none wb-interaction-area pt-4 view-transition-enter"
           >
             {/* Render all <section class="topic-section"> blocks */}
             <div
@@ -2359,7 +2702,7 @@ export default function App() {
 
       {/* =====================================================================
           SETTINGS MENU MODAL (Display Mode, Google Login & Profile, Feedback, Admin)
-          100% English System Language + 26px One UI Modal Radius
+          100% English System Language + 26px Squircle Modal Radius
          ===================================================================== */}
       {settingsOpen && (
         <div
@@ -2527,7 +2870,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* See / Hide All Dropdowns in Reader (English only) */}
+                   {/* See / Hide All Dropdowns in Reader (English only) */}
                   <div className="space-y-2">
                     <span className="block font-semibold opacity-80">
                       Interactive Mechanism &amp; Note Dropdowns
@@ -2549,6 +2892,72 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Adaptive Screen Form Factor & Viewing Area Control */}
+                  <div className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-[var(--accent)]">
+                        Adaptive Screen Profile
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold badge-success">
+                        {deviceProfile.label}
+                      </span>
+                    </div>
+                    <p className="text-[11px] opacity-80 leading-relaxed">
+                      Viewport: <span className="font-mono">{viewportSize.width}×{viewportSize.height}px</span> · Recommended Grid: <span className="font-mono">{deviceProfile.recommendedColumns} col(s)</span>. Automatically adapts layout margins and focus blocks for Phones, Passport Square Foldables, Book Foldables, DeX, and Desktop PCs.
+                    </p>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[11px] font-medium">
+                        Top Viewing Area
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setManualViewingCollapsed((prev) => !prev)
+                        }
+                        className="px-3 py-1 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[11px] font-semibold hover:border-[var(--accent)]"
+                      >
+                        {manualViewingCollapsed
+                          ? 'Expand Viewing Area'
+                          : 'Collapse Viewing Area'}
+                      </button>
+                    </div>
+
+                    {/* Low-End Device Efficiency Mode (60fps Lite) */}
+                    <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-medium">
+                          Low-End Device Efficiency (60fps Lite)
+                        </span>
+                        <span className="text-[10px] font-semibold text-[var(--accent)]">
+                          {isLowEndEfficiencyActive ? 'Active' : 'Standard GPU'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {(['auto', 'enabled', 'disabled'] as const).map(
+                          (mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              data-testid={`efficiency-mode-${mode}`}
+                              onClick={() => setEfficiencyMode(mode)}
+                              className={`py-1.5 px-2 rounded-xl border text-[11px] font-semibold capitalize transition-all ${
+                                efficiencyMode === mode
+                                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                                  : 'border-[var(--border)] bg-[var(--bg-card)] opacity-80 hover:opacity-100'
+                              }`}
+                            >
+                              {mode === 'auto'
+                                ? 'Auto Detect'
+                                : mode === 'enabled'
+                                ? 'Always On'
+                                : 'Standard'}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -2568,15 +2977,15 @@ export default function App() {
                         <button
                           type="button"
                           onClick={handleGoogleLogin}
-                          className="w-full py-2.5 px-4 rounded-2xl bg-[var(--accent)] text-slate-950 font-bold hover:opacity-90 transition-opacity"
+                          className="w-full py-2.5 px-4 rounded-2xl btn-accent"
                         >
                           Continue with Google
                         </button>
                         {authErrorDetails && (
-                          <div className="p-3 rounded-xl border border-red-500/40 bg-red-950/20 text-[11px] space-y-2">
-                            <div className="font-semibold text-red-400 flex items-center justify-between">
+                          <div className="p-3 rounded-xl alert-danger text-[11px] space-y-2">
+                            <div className="font-semibold flex items-center justify-between">
                               <span>Authentication Issue:</span>
-                              <span className="font-mono text-[10px] opacity-75">
+                              <span className="font-mono text-[10px] opacity-80">
                                 {authErrorDetails.code}
                               </span>
                             </div>
@@ -2592,13 +3001,17 @@ export default function App() {
                                     navigator.clipboard.writeText(
                                       window.location.hostname
                                     );
-                                    alert(
-                                      `Copied: ${window.location.hostname}\n\nAdd this in Firebase Console -> Authentication -> Settings -> Authorized domains`
+                                    setDomainCopied(true);
+                                    window.setTimeout(
+                                      () => setDomainCopied(false),
+                                      3000
                                     );
                                   }}
-                                  className="px-2.5 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-semibold hover:border-[var(--accent)]"
+                                  className="px-2.5 py-1 rounded-lg bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border)] font-semibold hover:border-[var(--accent)]"
                                 >
-                                  Copy Domain: {window.location.hostname}
+                                  {domainCopied
+                                    ? `Copied: ${window.location.hostname}`
+                                    : `Copy Domain: ${window.location.hostname}`}
                                 </button>
                               </div>
                             )}
@@ -2608,7 +3021,7 @@ export default function App() {
                                   href={window.location.href}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-block px-2.5 py-1 rounded-lg bg-[var(--accent)] text-slate-950 font-bold hover:opacity-90"
+                                  className="inline-block px-2.5 py-1 rounded-lg btn-accent"
                                 >
                                   Open App in Full Browser Tab ↗
                                 </a>
@@ -2702,13 +3115,13 @@ export default function App() {
                       type="submit"
                       disabled={profileSaving}
                       data-testid="save-profile-btn"
-                      className="w-full py-2.5 rounded-2xl bg-[var(--accent)] text-slate-950 font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                      className="w-full py-2.5 rounded-2xl btn-accent disabled:opacity-50"
                     >
                       {profileSaving ? 'Saving...' : 'Save Student Profile'}
                     </button>
 
                     {profileStatusMsg && (
-                      <p className="text-emerald-400 text-[11px]">
+                      <p className="text-[var(--success-text)] font-medium text-[11px]">
                         {profileStatusMsg}
                       </p>
                     )}
@@ -2763,8 +3176,8 @@ export default function App() {
                           onClick={() => setFeedbackRating(star)}
                           className={`px-3 py-1.5 rounded-xl border text-xs font-bold inline-flex items-center gap-1 transition-all ${
                             feedbackRating >= star
-                              ? 'bg-amber-400/20 border-amber-400 text-amber-300'
-                              : 'border-[var(--border)] opacity-40'
+                              ? 'bg-[var(--caution-bg)] border-[var(--caution-border)] text-[var(--caution-text)]'
+                              : 'border-[var(--border)] opacity-45'
                           }`}
                         >
                           <StarIcon
@@ -2787,7 +3200,7 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={feedbackSubmitting}
-                      className="w-full py-2.5 rounded-2xl bg-[var(--accent)] text-slate-950 font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                      className="w-full py-2.5 rounded-2xl btn-accent disabled:opacity-50"
                     >
                       {feedbackSubmitting ? 'Sending...' : 'Send Feedback'}
                     </button>
@@ -2810,7 +3223,7 @@ export default function App() {
                           className="p-3 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-1"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-amber-400 font-bold inline-flex items-center gap-0.5">
+                            <span className="text-[var(--caution-border)] font-bold inline-flex items-center gap-0.5">
                               {Array.from({ length: fb.rating }).map(
                                 (_, idx) => (
                                   <StarIcon
@@ -2824,7 +3237,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => handleDeleteFeedback(fb.id)}
-                              className="text-red-400 hover:underline text-[11px]"
+                              className="text-[var(--danger-text)] font-medium hover:underline text-[11px]"
                             >
                               Delete
                             </button>
@@ -2855,7 +3268,7 @@ export default function App() {
                           setSettingsOpen(false);
                           setUploadModalOpen(true);
                         }}
-                        className="px-4 py-2 rounded-2xl bg-[var(--accent)] text-slate-950 font-bold"
+                        className="px-4 py-2 rounded-2xl btn-accent"
                       >
                         + Upload / Build New Topic Page
                       </button>
@@ -2890,7 +3303,7 @@ export default function App() {
                       />
                       <button
                         type="submit"
-                        className="px-3.5 py-2 rounded-2xl bg-[var(--accent)] text-slate-950 font-bold shrink-0"
+                        className="px-3.5 py-2 rounded-2xl btn-accent shrink-0"
                       >
                         Add
                       </button>
@@ -2913,7 +3326,7 @@ export default function App() {
                               onClick={() =>
                                 handleRemoveSelectiveAdminEmail(email)
                               }
-                              className="text-red-400 hover:underline text-[11px]"
+                              className="text-[var(--danger-text)] font-medium hover:underline text-[11px]"
                             >
                               Remove
                             </button>
@@ -2925,45 +3338,98 @@ export default function App() {
                 </div>
               )}
 
-              {/* TAB 5: INSTRUCTIONS MANUAL & OPEN SOURCE LICENSE */}
+              {/* TAB 5: INSTRUCTIONS MANUAL, MULTI-OS NATIVE APP PLAN & OPEN SOURCE LICENSE */}
               {settingsTab === 'manual' && (
                 <div className="space-y-4 text-xs">
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2">
-                    <div className="flex items-center justify-between">
+                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-bold text-sm text-[var(--accent)]">
                         Web Books by Afeed
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold badge-success">
                         MIT Open Source
                       </span>
                     </div>
                     <p className="opacity-80 leading-relaxed text-[11px]">
-                      A serene, distraction-free digital textbook reader and chemistry notebook designed following Samsung One UI principles, featuring OLED Pitch-Black mode, KaTeX mhchem typography, and zero data loss.
+                      A distraction-free multi-platform digital textbook reader and chemistry notebook featuring collapsible Viewing Areas, adaptive layouts for Phones, Passport Foldables, Book Foldables, DeX &amp; Desktop PCs, and theme-safe OLED / Sepia / Light palettes.
                     </p>
+                    {deferredInstallPrompt && !isInstalledPWA && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await deferredInstallPrompt.prompt();
+                          const choice = await deferredInstallPrompt.userChoice;
+                          if (choice.outcome === 'accepted') {
+                            setIsInstalledPWA(true);
+                          }
+                          setDeferredInstallPrompt(null);
+                        }}
+                        className="w-full py-2 px-3 rounded-xl btn-accent text-xs"
+                      >
+                        Install Web Books App on This Device
+                      </button>
+                    )}
+                  </div>
+
+                  {/* MULTI-OS NATIVE APP ARCHITECTURE & BUILD PLAN (Android, iOS, Windows, macOS, Linux — ARM64 & x86_64) */}
+                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] space-y-3">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--accent)]">
+                      Native App Plan: Android, iOS, Windows, macOS &amp; Linux (ARM64 &amp; x86_64)
+                    </h4>
+                    <div className="space-y-2.5 text-[11px] leading-relaxed">
+                      <div className="p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-1">
+                        <div className="font-bold text-[var(--text-main)]">
+                          1. Android (.apk / .aab) &amp; iOS (.ipa) — Capacitor 6
+                        </div>
+                        <p className="opacity-80">
+                          Wraps this Vite build into native Android Studio &amp; Xcode projects with full offline storage, DeX multi-window resize support, and foldable continuity.
+                        </p>
+                        <pre className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] font-mono text-[10px] overflow-x-auto">
+{`npm i @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+npx cap init "Web Books" com.afeed.webbooks --web-dir=dist
+npm run build && npx cap add android && npx cap add ios && npx cap sync`}
+                        </pre>
+                        <p className="opacity-75 text-[10px]">
+                          • <strong>Android ARM64 &amp; x86_64:</strong> In <code className="font-mono">android/app/build.gradle</code> set <code className="font-mono">ndk.abiFilters &quot;arm64-v8a&quot;, &quot;x86_64&quot;</code> for phones/foldables (ARM64) and Chromebooks/Android PC (x86_64).<br />
+                          • <strong>iOS ARM64:</strong> Archive in Xcode for iPhone &amp; iPad (<code className="font-mono">arm64</code>).
+                        </p>
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-1">
+                        <div className="font-bold text-[var(--text-main)]">
+                          2. Windows, macOS &amp; Linux (ARM64 + x86_64) — Tauri v2 (Rust)
+                        </div>
+                        <p className="opacity-80">
+                          Compiles tiny (~6 MB) native OS binaries using the native OS WebView (WebView2 on Windows, WebKit on macOS/Linux) instead of bundling a 150 MB Electron runtime:
+                        </p>
+                        <pre className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] font-mono text-[10px] overflow-x-auto">
+{`npm i -D @tauri-apps/cli@latest && npx tauri init
+# Windows x86_64 & ARM64 (.msi / .exe NSIS):
+npx tauri build --target x86_64-pc-windows-msvc
+npx tauri build --target aarch64-pc-windows-msvc
+# macOS Universal Binary (Apple Silicon ARM64 + Intel x86_64 .dmg/.app):
+npx tauri build --target universal-apple-darwin
+# Linux x86_64 & ARM64 (.deb / .AppImage / .rpm):
+npx tauri build --target x86_64-unknown-linux-gnu
+npx tauri build --target aarch64-unknown-linux-gnu`}
+                        </pre>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] space-y-3">
                     <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--accent)]">
                       Instructions Manual &amp; Reading Tips
                     </h4>
-                    <div className="space-y-2.5 opacity-85 leading-relaxed text-[11px]">
+                    <div className="space-y-2 opacity-85 leading-relaxed text-[11px]">
                       <div>
-                        <strong>1. Three-Tier Navigation:</strong> Tap any Subject &amp; Paper card → Tap Chapter → Tap Topic module to launch the reader. Use the back arrow (<span className="font-mono">←</span>) in the header to navigate up.
+                        <strong>1. Three-Tier Navigation Flow:</strong> Tap any Subject &amp; Paper card → Tap Chapter → Tap Topic module to launch the reader.
                       </div>
                       <div>
-                        <strong>2. True OLED Pitch-Black:</strong> Switch between OLED Dark (<span className="font-mono">#000000</span>), Warm Sepia Reading Mode, and Light Mode in Display settings.
+                        <strong>2. Collapsible Viewing Area:</strong> Scroll down (or tap the collapse chevron <span className="font-mono">^</span> in the header) to smoothly collapse the top Viewing Area into the compact sticky bar.
                       </div>
                       <div>
-                        <strong>3. Quick Table of Contents:</strong> While reading, tap the Quick Topics icon (<span className="font-mono">📑</span>) at the top-right header corner to jump across chapters and sections.
-                      </div>
-                      <div>
-                        <strong>4. Search &amp; Filtering:</strong> Tap (<span className="font-mono">🔍</span>) to find any topic by keyword, class (Class 1–8, SSC, HSC), or subject.
-                      </div>
-                      <div>
-                        <strong>5. Student Profile:</strong> Set your Class and School/College under Account. Your home screen automatically adapts to show your class's subjects.
-                      </div>
-                      <div>
-                        <strong>6. Reaction Mechanisms:</strong> Tap &ldquo;গুরুত্বপূর্ণ তথ্য ও কৌশল (Important Notes &amp; Mechanism)&rdquo; on any topic to inspect step-by-step pathways and curved electron-pushing arrows.
+                        <strong>3. Adaptive DeX, Foldable &amp; Passport Layout:</strong> Automatically scales across Phones (1 col), Passport Square Foldables (2 cols + compact header), Book Foldables/Tablets (3 cols), and DeX / Desktop PCs (4–5 cols).
                       </div>
                     </div>
                   </div>
@@ -3115,7 +3581,7 @@ The above copyright notice and this permission notice shall be included in all c
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-2xl bg-[var(--accent)] text-slate-950 font-bold"
+                  className="px-5 py-2 rounded-2xl btn-accent"
                 >
                   Save &amp; Publish Page
                 </button>
