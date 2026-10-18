@@ -10,13 +10,49 @@
   "background_color": "#000000",
   "theme_color": "#000000",
   "orientation": "any",
+  "lang": "bn",
+  "dir": "ltr",
   "categories": ["education", "books", "productivity"],
   "icons": [
     {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/icon.svg",
-      "sizes": "192x192 512x512",
+      "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chemistry 2nd Paper",
+      "short_name": "Chemistry",
+      "description": "Organic Chemistry Reactions & Alkene Mechanisms",
+      "url": "/?subject=Chemistry&paper=2nd%20Paper",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Bangla 1st Paper",
+      "short_name": "Bangla",
+      "description": "Bangla Prose and Poetry Topics",
+      "url": "/?subject=Bangla&paper=1st%20Paper",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     }
   ]
 }

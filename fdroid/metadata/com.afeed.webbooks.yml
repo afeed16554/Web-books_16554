@@ -1,0 +1,44 @@
+# F-Droid Metadata Recipe for Web Books by Afeed
+# Place this file or submit a Merge Request to: https://gitlab.com/fdroid/fdroiddata/-/tree/master/metadata
+Categories:
+  - Education
+  - Reading
+  - Science
+License: MIT
+AuthorName: Afeed
+SourceCode: https://github.com/fha16554/web-books
+IssueTracker: https://github.com/fha16554/web-books/issues
+Changelog: https://github.com/fha16554/web-books/releases
+
+AutoName: Web Books
+
+Summary: Clean, distraction-free digital concept reader and notebook
+Description: |-
+  Web Books is an open-source, distraction-free educational concept reader
+  and notebook designed for students and researchers.
+  Features:
+  * Complete NCTB Bangla & English curriculum (Class 1 to 12)
+  * Chemistry reaction mechanisms with KaTeX mhchem and adaptive SVGs
+  * Multi-form-factor support: Phones, Tablets, Foldables, and Samsung DeX
+  * Pitch-Black OLED Dark Mode, Yellow Paper Reading Mode, and Light Mode
+  * 100% offline-ready Progressive Web App & Android build
+
+RepoType: git
+Repo: https://github.com/fha16554/web-books.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: android/app
+    gradle:
+      - yes
+    prebuild:
+      - npm ci
+      - npm run build
+      - npx cap sync android
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentCode: 1

@@ -19,6 +19,7 @@ import {
 import {
   auth,
   db,
+  FIREBASE_PROJECT_ID,
   googleProvider,
   handleFirestoreError,
   OperationType,
@@ -3515,25 +3516,39 @@ export default function App() {
                                 authErrorDetails.message}
                             </p>
                             {authErrorDetails.code === 'unauthorized-domain' && (
-                              <div className="pt-1 flex flex-wrap gap-2 items-center">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(
-                                      window.location.hostname
-                                    );
-                                    setDomainCopied(true);
-                                    window.setTimeout(
-                                      () => setDomainCopied(false),
-                                      3000
-                                    );
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border)] font-semibold hover:border-[var(--accent)]"
-                                >
-                                  {domainCopied
-                                    ? `Copied: ${window.location.hostname}`
-                                    : `Copy Domain: ${window.location.hostname}`}
-                                </button>
+                              <div className="pt-2 flex flex-col gap-2">
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(
+                                        window.location.hostname || 'localhost'
+                                      );
+                                      setDomainCopied(true);
+                                      window.setTimeout(
+                                        () => setDomainCopied(false),
+                                        3000
+                                      );
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border)] font-semibold hover:border-[var(--accent)]"
+                                  >
+                                    {domainCopied
+                                      ? `Copied: ${window.location.hostname || 'localhost'}`
+                                      : `Copy Domain: ${window.location.hostname || 'localhost'}`}
+                                  </button>
+                                  <a
+                                    href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/settings`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-2.5 py-1 rounded-lg btn-accent text-[11px] font-semibold flex items-center gap-1"
+                                  >
+                                    Open Firebase Settings ↗
+                                  </a>
+                                </div>
+                                <div className="text-[10px] opacity-80 space-y-1 leading-snug">
+                                  <p>• <strong>To enable Google Login on Android APK</strong>: Click <em>Open Firebase Settings</em> above, scroll to <strong>Authorized Domains</strong>, click <strong>Add domain</strong>, type <code>localhost</code>, and click <strong>Save</strong>.</p>
+                                  <p>• <strong>Offline Note</strong>: You can still save and use your Student Class & Profile below locally — login is optional for offline book reading!</p>
+                                </div>
                               </div>
                             )}
                             {authErrorDetails.code === 'popup-blocked' && (
