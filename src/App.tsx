@@ -56,11 +56,10 @@ declare global {
     togglePanel?: (panelId: string) => void;
   }
 }
-
 type ThemeMode = 'dark' | 'yellow' | 'light';
 type ViewMode = 'home' | 'reader';
 type HomeDrillStage = 'subjects' | 'chapters' | 'topics';
-type SettingsTab = 'display' | 'account' | 'feedback' | 'admin';
+type SettingsTab = 'display' | 'account' | 'feedback' | 'admin' | 'manual';
 
 interface FeedbackRecord {
   id: string;
@@ -720,20 +719,50 @@ export default function App() {
     }
   };
 
-  // Google Sign-In handler
+  // Google Sign-In handler with actionable diagnostic messages
+  const [authErrorDetails, setAuthErrorDetails] = useState<{
+    code: string;
+    message: string;
+    actionableTip?: string;
+  } | null>(null);
+
   const handleGoogleLogin = async () => {
     setAuthError('');
+    setAuthErrorDetails(null);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (err) {
-      setAuthError(
-        err instanceof Error ? err.message : 'Google Sign-In failed.'
-      );
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      let tip = '';
+      let code = 'auth-error';
+
+      if (errMsg.includes('auth/unauthorized-domain')) {
+        code = 'unauthorized-domain';
+        tip = `Domain "${window.location.hostname}" is not yet in Firebase Auth's Authorized Domains list. Add it in Firebase Console -> Authentication -> Settings -> Authorized Domains.`;
+      } else if (
+        errMsg.includes('auth/popup-blocked') ||
+        errMsg.includes('popup-closed-by-user')
+      ) {
+        code = 'popup-blocked';
+        tip =
+          'The login popup was blocked by the browser or preview iframe. Open the app directly in a new tab or allow popups.';
+      } else if (errMsg.includes('auth/operation-not-allowed')) {
+        code = 'operation-not-allowed';
+        tip =
+          'Google Sign-In is disabled in your Firebase project. Enable "Google" under Firebase Console -> Authentication -> Sign-in method.';
+      } else if (errMsg.includes('auth/network-request-failed')) {
+        code = 'network-error';
+        tip = 'Network connection failed. Please verify your internet connection.';
+      }
+
+      setAuthError(errMsg);
+      setAuthErrorDetails({ code, message: errMsg, actionableTip: tip });
     }
   };
 
   const handleLogout = async () => {
     setAuthError('');
+    setAuthErrorDetails(null);
     try {
       await signOut(auth);
     } catch (err) {
@@ -1118,8 +1147,9 @@ export default function App() {
   };
 
   // Clean header title:
+  // Clean header title:
   // In Reader mode: ONLY "Chapter Name : Topic Name"
-  // In Home mode: Reflects the active One UI stage ("All notes", "Chemistry 2nd Paper", or "2nd Chapter: Organic Chemistry")
+  // In Home mode: Reflects the active One UI stage ("Web Books", "Chemistry 2nd Paper", or "2nd Chapter: Organic Chemistry")
   const headerDisplayTitle = useMemo(() => {
     if (viewMode === 'reader') {
       return formatCleanReaderHeader(activePage.chapter, activePage.title);
@@ -1132,10 +1162,7 @@ export default function App() {
         ? `${selectedSubject} ${selectedPaper}`
         : selectedSubject;
     }
-    if (effectiveHomeClassFilter !== 'ALL') {
-      return effectiveHomeClassFilter;
-    }
-    return 'All notes';
+    return 'Web Books';
   }, [
     viewMode,
     activePage,
@@ -1143,7 +1170,33 @@ export default function App() {
     activeExpandedChapter,
     selectedSubject,
     selectedPaper,
-    effectiveHomeClassFilter,
+  ]);
+
+  // Dynamically synchronize document.title across browser tabs and mobile browsers
+  useEffect(() => {
+    if (viewMode === 'reader') {
+      document.title = `${formatCleanReaderHeader(
+        activePage.chapter,
+        activePage.title
+      )} — Web Books by Afeed`;
+    } else if (homeStage === 'topics' && activeExpandedChapter) {
+      document.title = `${activeExpandedChapter.chapterTitle} — Web Books by Afeed`;
+    } else if (homeStage === 'chapters' && selectedSubject !== 'ALL') {
+      const paperSuffix =
+        selectedPaper !== 'ALL' && selectedPaper !== 'Single Paper'
+          ? ` ${selectedPaper}`
+          : '';
+      document.title = `${selectedSubject}${paperSuffix} — Web Books by Afeed`;
+    } else {
+      document.title = 'Web Books by Afeed';
+    }
+  }, [
+    viewMode,
+    activePage,
+    homeStage,
+    activeExpandedChapter,
+    selectedSubject,
+    selectedPaper,
   ]);
 
   // Step-by-step Back button handler for One UI hierarchical navigation
@@ -1450,13 +1503,20 @@ export default function App() {
               </button>
             )}
 
-            <h1
-              data-testid="clean-header-title"
-              className="text-sm sm:text-base font-bold truncate"
-              title={headerDisplayTitle}
-            >
-              {headerDisplayTitle}
-            </h1>
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <h1
+                data-testid="clean-header-title"
+                className="text-sm sm:text-base font-bold truncate"
+                title={headerDisplayTitle}
+              >
+                {headerDisplayTitle}
+              </h1>
+              {viewMode === 'home' && homeStage === 'subjects' && (
+                <span className="text-[11px] font-medium text-[var(--text-muted)] opacity-55 shrink-0 hidden sm:inline select-none">
+                  by Afeed
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Right Corner Zone: Quick Topic Content Button (ONLY inside Reader content) + Search Button */}
@@ -1786,16 +1846,25 @@ export default function App() {
                       className="oneui-viewing-area"
                     >
                       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                        {effectiveHomeClassFilter === 'ALL'
-                          ? 'Web Books'
-                          : effectiveHomeClassFilter}
+                        Web Books
                       </h2>
-                      <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1.5">
-                        {effectiveHomeClassFilter === 'ALL'
-                          ? 'by Afeed · Select a subject to view its chapters'
-                          : `${
-                              schoolName ? `${schoolName} · ` : ''
-                            }Select a subject to view its chapters`}
+                      <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
+                        <span className="text-xs sm:text-sm font-medium text-[var(--text-muted)] opacity-60">
+                          by Afeed
+                        </span>
+                        {effectiveHomeClassFilter !== 'ALL' && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--surface-subtle)] text-[var(--text-secondary)] border border-[var(--border)]">
+                            {effectiveHomeClassFilter}
+                          </span>
+                        )}
+                        {schoolName && (
+                          <span className="text-xs text-[var(--text-muted)] opacity-65 truncate max-w-xs">
+                            · {schoolName}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] opacity-70 mt-1">
+                        Select a subject to view its chapters
                       </p>
                     </section>
 
@@ -2362,6 +2431,17 @@ export default function App() {
                   Admin Panel
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setSettingsTab('manual')}
+                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  settingsTab === 'manual'
+                    ? 'border-[var(--accent)] text-[var(--accent)]'
+                    : 'border-transparent opacity-70 hover:opacity-100'
+                }`}
+              >
+                Manual &amp; License
+              </button>
             </div>
 
             {/* Modal Content Body */}
@@ -2492,10 +2572,49 @@ export default function App() {
                         >
                           Continue with Google
                         </button>
-                        {authError && (
-                          <p className="text-red-400 text-[11px]">
-                            {authError}
-                          </p>
+                        {authErrorDetails && (
+                          <div className="p-3 rounded-xl border border-red-500/40 bg-red-950/20 text-[11px] space-y-2">
+                            <div className="font-semibold text-red-400 flex items-center justify-between">
+                              <span>Authentication Issue:</span>
+                              <span className="font-mono text-[10px] opacity-75">
+                                {authErrorDetails.code}
+                              </span>
+                            </div>
+                            <p className="text-[var(--text-main)] opacity-90 leading-relaxed">
+                              {authErrorDetails.actionableTip ||
+                                authErrorDetails.message}
+                            </p>
+                            {authErrorDetails.code === 'unauthorized-domain' && (
+                              <div className="pt-1 flex flex-wrap gap-2 items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(
+                                      window.location.hostname
+                                    );
+                                    alert(
+                                      `Copied: ${window.location.hostname}\n\nAdd this in Firebase Console -> Authentication -> Settings -> Authorized domains`
+                                    );
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-semibold hover:border-[var(--accent)]"
+                                >
+                                  Copy Domain: {window.location.hostname}
+                                </button>
+                              </div>
+                            )}
+                            {authErrorDetails.code === 'popup-blocked' && (
+                              <div className="pt-1">
+                                <a
+                                  href={window.location.href}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block px-2.5 py-1 rounded-lg bg-[var(--accent)] text-slate-950 font-bold hover:opacity-90"
+                                >
+                                  Open App in Full Browser Tab ↗
+                                </a>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -2802,6 +2921,66 @@ export default function App() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: INSTRUCTIONS MANUAL & OPEN SOURCE LICENSE */}
+              {settingsTab === 'manual' && (
+                <div className="space-y-4 text-xs">
+                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-[var(--accent)]">
+                        Web Books by Afeed
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        MIT Open Source
+                      </span>
+                    </div>
+                    <p className="opacity-80 leading-relaxed text-[11px]">
+                      A serene, distraction-free digital textbook reader and chemistry notebook designed following Samsung One UI principles, featuring OLED Pitch-Black mode, KaTeX mhchem typography, and zero data loss.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] space-y-3">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--accent)]">
+                      Instructions Manual &amp; Reading Tips
+                    </h4>
+                    <div className="space-y-2.5 opacity-85 leading-relaxed text-[11px]">
+                      <div>
+                        <strong>1. Three-Tier Navigation:</strong> Tap any Subject &amp; Paper card → Tap Chapter → Tap Topic module to launch the reader. Use the back arrow (<span className="font-mono">←</span>) in the header to navigate up.
+                      </div>
+                      <div>
+                        <strong>2. True OLED Pitch-Black:</strong> Switch between OLED Dark (<span className="font-mono">#000000</span>), Warm Sepia Reading Mode, and Light Mode in Display settings.
+                      </div>
+                      <div>
+                        <strong>3. Quick Table of Contents:</strong> While reading, tap the Quick Topics icon (<span className="font-mono">📑</span>) at the top-right header corner to jump across chapters and sections.
+                      </div>
+                      <div>
+                        <strong>4. Search &amp; Filtering:</strong> Tap (<span className="font-mono">🔍</span>) to find any topic by keyword, class (Class 1–8, SSC, HSC), or subject.
+                      </div>
+                      <div>
+                        <strong>5. Student Profile:</strong> Set your Class and School/College under Account. Your home screen automatically adapts to show your class's subjects.
+                      </div>
+                      <div>
+                        <strong>6. Reaction Mechanisms:</strong> Tap &ldquo;গুরুত্বপূর্ণ তথ্য ও কৌশল (Important Notes &amp; Mechanism)&rdquo; on any topic to inspect step-by-step pathways and curved electron-pushing arrows.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2">
+                    <div className="font-bold text-xs">MIT Open Source License</div>
+                    <pre className="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-mono whitespace-pre-wrap leading-tight opacity-75 max-h-36 overflow-y-auto">
+{`MIT License
+Copyright (c) 2026 Afeed
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.`}
+                    </pre>
+                    <p className="text-[10px] opacity-65">
+                      Connected to GitHub with full README.md instructions manual and LICENSE file ready to share.
+                    </p>
                   </div>
                 </div>
               )}

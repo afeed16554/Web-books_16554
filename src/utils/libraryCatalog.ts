@@ -127,7 +127,7 @@ export const BUILT_IN_PAGES: LibraryTopicPage[] = [
       'Hydrocarbons: Preparation, Properties, Mechanism, Ozonolysis & Identification Tests (12 Main Topics)',
     updatedDate: '18 Oct',
     sectionsHtml: getAllSectionsHtml(),
-    mainTopics: ENGLISH_MAIN_TOPICS.map((t: TopicItem) => ({
+    mainTopics: ENGLISH_MAIN_TOPICS.map((t) => ({
       id: t.id,
       title: t.title,
     })),

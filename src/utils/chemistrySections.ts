@@ -2,7 +2,7 @@ export interface TopicItem {
   id: string;
   title: string;
   isMainTopic?: boolean;
-  batch: 'batch-1' | 'batch-2' | 'batch-3';
+  batch: 'batch-1' | 'batch-2' | 'batch-3' | 'batch-4' | 'batch-5';
   html: string;
 }
 
