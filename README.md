@@ -4,11 +4,12 @@
 > *Engineered for students, educators, and lifelong learners — featuring OLED Pitch-Black mode, KaTeX `mhchem` mathematical chemistry rendering, adaptive 2D molecular SVGs, and zero data loss textbook transcription.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Android APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84.svg?logo=android&logoColor=white)](https://github.com/afeed16554/Web-books_16554/releases/latest)
+[![Windows EXE](https://img.shields.io/badge/Download-Windows%20EXE-0078D6.svg?logo=windows&logoColor=white)](https://github.com/afeed16554/Web-books_16554/releases/latest)
+[![Web Live](https://img.shields.io/badge/Web%20App-Live%20Demo-blueviolet.svg?logo=googlechrome&logoColor=white)](https://afeed16554.github.io/Web-books_16554/)
 [![React](https://img.shields.io/badge/React-19.0-61dafb.svg?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6.svg?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.0-646cff.svg?logo=vite)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-38bdf8.svg?logo=tailwind-css)](https://tailwindcss.com/)
-[![KaTeX](https://img.shields.io/badge/KaTeX-mhchem-05b584.svg)](https://katex.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%26%20Auth-ffca28.svg?logo=firebase)](https://firebase.google.com/)
 
 ---
@@ -29,6 +30,7 @@
 - [Tech Stack](#tech-stack)
 - [Getting Started & Local Development](#getting-started--local-development)
 - [Building & Deployment](#building--deployment)
+- [Downloads & Native Apps (Android APK & Windows EXE)](#-downloads--native-apps-android-apk--windows-exe)
 - [Contributing](#contributing)
 - [License](#license)
 - [Author & Acknowledgments](#author--acknowledgments)
@@ -205,60 +207,50 @@ npm run preview
 
 ---
 
-## 📱💻 Multi-OS Native App Plan (Android, iOS, Windows, macOS & Linux — ARM64 & x86_64)
+## 📲 Downloads & Native Apps (Android APK & Windows EXE)
 
-Because **Web Books by Afeed** compiles to a self-contained static bundle (`dist/`), you can ship native apps across all 5 operating systems and both CPU architectures (`ARM64` & `x86_64`) from this single codebase:
+**Web Books by Afeed** provides verified, ready-to-use native packages for Android and Windows Desktop, built directly from this repository via automated GitHub Actions:
 
-### 1. Adaptive Form-Factor Matrix
-| Form Factor | Viewport Range | Adaptive Grid & Layout Behavior |
-| :--- | :--- | :--- |
-| **Phones** | `< 640px` | 1-column focus blocks, slide-over drawer, thumb-reachable Collapsible Viewing Area |
-| **Passport / Square Foldables** | `600px–940px` (`0.78–1.38` ratio) | Compact Viewing Area + balanced 2-column focus card grid |
-| **Book Foldables & Tablets** | `640px–1179px` | 2-to-3 column focus grid + persistent or toggleable navigation sidebar |
-| **DeX / Android Desktop & PC** | `>= 1180px` | 4-to-5 column focus grid + full keyboard/mouse ergonomics + header form-factor indicator |
+### 📥 Direct Downloads & Live Access
 
-### 2. Android (`.apk` / `.aab`) & iOS (`.ipa`) — Capacitor 6
-1. Install Capacitor in the project root:
-   ```bash
-   npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
-   npx cap init "Web Books" com.afeed.webbooks --web-dir=dist
-   npm run build
-   npx cap add android
-   npx cap add ios
-   npx cap sync
-   ```
-2. **Android (`ARM64` + `x86_64`)**:
-   - In `android/app/build.gradle`, enable multi-ABI support for phones/foldables (`arm64-v8a`) and Chromebooks / Android Desktop / Emulators (`x86_64`):
-     ```groovy
-     defaultConfig {
-         ndk {
-             abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
-         }
-     }
-     ```
-   - In `AndroidManifest.xml`, keep `android:resizeableActivity="true"` so DeX and foldable multi-window transitions work seamlessly.
-   - Build signed APK/AAB via `cd android && ./gradlew assembleRelease bundleRelease`.
-3. **iOS / iPadOS (`ARM64`)**:
-   - Run `npx cap open ios` on macOS with Xcode and archive for iPhone & iPad (`arm64`).
+| Platform | Format | Status | Direct Download / Access Link |
+| :--- | :--- | :--- | :--- |
+| **Android Phone / Tablet / DeX** | `.apk` (Capacitor) | ✅ Ready | **[Download Latest Android APK](https://github.com/afeed16554/Web-books_16554/releases/latest)** |
+| **Windows Desktop PC** | `.exe` (Electron Installer) | ✅ Ready | **[Download Latest Windows EXE](https://github.com/afeed16554/Web-books_16554/releases/latest)** |
+| **Online Web App / PWA** | Web & Offline Service Worker | ✅ Live | **[Open Web Books Online](https://afeed16554.github.io/Web-books_16554/)** |
+| **GitHub Releases Archive** | All Versions & Assets | ✅ Active | **[View All Releases & Downloads](https://github.com/afeed16554/Web-books_16554/releases)** |
 
-### 3. Windows, macOS & Linux Desktop (`ARM64` + `x86_64`) — Tauri v2 (Rust)
-Tauri v2 uses the operating system's native webview (WebView2 on Windows, WebKit on macOS/Linux) to produce ~6 MB native installers instead of 150 MB Electron bundles:
-```bash
-npm install -D @tauri-apps/cli@latest
-npx tauri init
+---
 
-# Windows x86_64 & Windows on ARM64 (.msi / .exe NSIS):
-npx tauri build --target x86_64-pc-windows-msvc
-npx tauri build --target aarch64-pc-windows-msvc
+### 📱 Installing on Android (.apk)
 
-# macOS Universal Binary (Apple Silicon ARM64 + Intel x86_64 .dmg / .app):
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-npx tauri build --target universal-apple-darwin
+1. Open **[GitHub Releases Latest](https://github.com/afeed16554/Web-books_16554/releases/latest)** on your Android phone or tablet.
+2. Scroll to the **Assets** section at the bottom of the release.
+3. Download the `.apk` file (or `android-apk.zip`).
+4. Tap the downloaded file to install:
+   - If prompted by Android, toggle **"Allow from this source"** in your browser or file manager settings.
+5. Tap **Open** and enjoy distraction-free reading!
+6. **100% Offline Capability**: All subjects (Class 1 to 8, SSC, HSC), chemistry reaction notes, equations, formulas, and local student profiles work completely offline without needing mobile data or Google Sign-In.
 
-# Linux x86_64 & ARM64 (.deb / .AppImage / .rpm):
-npx tauri build --target x86_64-unknown-linux-gnu
-npx tauri build --target aarch64-unknown-linux-gnu
-```
+---
+
+### 💻 Installing on Windows (.exe)
+
+1. Open **[GitHub Releases Latest](https://github.com/afeed16554/Web-books_16554/releases/latest)** on your Windows PC.
+2. Under **Assets**, download `WebBooks-Setup.exe` (or `windows-exe.zip`).
+3. Run the installer to install **Web Books** on your computer.
+4. Launch the application from your Start Menu or Desktop shortcut.
+
+---
+
+### ⚙️ How the Automated Build Pipeline Works
+
+This repository uses a fully automated continuous integration workflow defined in [`.github/workflows/release-binaries.yml`](.github/workflows/release-binaries.yml):
+
+* **Android Native App**: Built with **Capacitor 6** (`capacitor.config.json`).
+* **Windows Desktop App**: Packaged with **Electron 33** + **electron-builder** (`main.cjs` and `package.json`).
+* **Automated Builds**: Whenever a new release tag starting with `v*` (e.g. `v1.0.1`, `v1.1.0`) is published on GitHub, GitHub Actions automatically compiles both the **Android APK** and **Windows EXE** and attaches them directly to the release page.
+* **Manual Dispatch**: You can also trigger an immediate build from GitHub by going to **Actions** → **Build and Release Native Binaries** → **Run workflow**.
 
 ---
 
