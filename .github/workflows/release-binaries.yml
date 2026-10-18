@@ -1,70 +1,78 @@
 name: Build and Release Native Binaries
 
 on:
+  workflow_dispatch: # Lets you trigger builds manually from the Actions tab!
   push:
     tags:
-      - 'v*' # Workflow triggers when you push a tag like v1.0.0
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   build-windows-exe:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: '22'
       
       - name: Install dependencies and Build Web
         run: |
-          bun install
-          bun run build
+          npm install --legacy-peer-deps
+          npm run build
           
       - name: Build Windows EXE
-        run: bun run electron:dist
+        run: npm run electron:dist
         
       - name: Upload EXE Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: release-builds/**/*.exe
+          path: release-builds/*.exe
 
   build-android-apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
           
-      - name: Initialize and Add Android
+      - name: Install, Build Web, and Add Android
         run: |
-          bun install
-          bun run build
-          bunx cap init "Web Books" "com.afeed.webbooks" --web-dir dist
-          bunx cap add android
+          npm install --legacy-peer-deps
+          npm run build
+          npx cap add android
           
       - name: Build Android APK
         working-directory: ./android
-        run: ./gradlew assembleDebug 
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
         
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: android/app/build/outputs/apk/debug/**/*.apk
+          path: android/app/build/outputs/apk/debug/*.apk
 
   create-github-release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-windows-exe, build-android-apk]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            windows-exe/**/*.exe
-            android-apk/**/*.apk
+            windows-exe/*.exe
+            android-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
