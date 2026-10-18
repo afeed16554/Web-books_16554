@@ -1,4 +1,4 @@
-# Web Books by Afeed
+# <a href="https://afeed16554.github.io/Web-books_16554/">Web Books by Afeed</a>
 
 > **Clean, Distraction-Free Samsung One UI Digital Concept Reader & Open-Source Chemistry Notebook**  
 > *Engineered for students, educators, and lifelong learners — featuring OLED Pitch-Black mode, KaTeX `mhchem` mathematical chemistry rendering, adaptive 2D molecular SVGs, and zero data loss textbook transcription.*
