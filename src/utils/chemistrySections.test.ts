@@ -27,7 +27,35 @@ import {
   PRIMARY_ADMIN_EMAIL,
   shouldEnableLowEndEfficiency,
   splitSubjectsByCategory,
+  cycleCurveProfile,
+  getCurveProfileConfig,
+  resolveUserRole,
+  canApproveModeratorRequests,
+  canManageSecondaryAdmins,
+  canModifyMainAdmin,
+  canSubmitTopicContent,
+  doesContentRequireApproval,
+  canApproveModeratorContent,
+  resolveInitialTheme,
+  cycleAppThemeMode,
+  getCurveRadiusPx,
+  detectAppVariant,
+  parseSemver,
+  compareSemver,
+  evaluateReleaseUpdateStatus,
+  resolveNotificationTapAction,
+  FALLBACK_GITHUB_RELEASES,
+  APP_CURRENT_VERSION,
+  GITHUB_REPO_URL,
+  GITHUB_RELEASES_URL,
 } from './libraryCatalog.ts';
+import {
+  OFFICIAL_MIT_LICENSE_TEXT,
+  WEB_BOOKS_GLOBE_SVG_RAW,
+  WEB_BOOKS_MARK_SVG_RAW,
+  getWebBooksGlobeDataUri,
+  getWebBooksMarkDataUri,
+} from './brandAssets.ts';
 
 test('All 5 batches contain the expected 13 sections and 12 main navigation topics', () => {
   assert.equal(
@@ -197,7 +225,7 @@ test('Collapsible Viewing Area collapses smoothly on scroll', () => {
   assert.equal(scrolledState.compactHeaderTitleOpacity, 1);
 });
 
-test('Adaptive device form-factor detector distinguishes Phone, Passport Foldable, Tablet Foldable, and DeX / Desktop PC', () => {
+test('Adaptive device form-factor detector distinguishes Phone, Passport Foldable, Tablet Foldable, and Desktop / Large Display', () => {
   const phone = detectDeviceFormFactor(390, 844);
   assert.equal(phone.formFactor, 'phone');
   assert.equal(phone.showCompactRailWhenCollapsed, false);
@@ -209,10 +237,10 @@ test('Adaptive device form-factor detector distinguishes Phone, Passport Foldabl
   const tablet = detectDeviceFormFactor(1024, 768);
   assert.equal(tablet.formFactor, 'tablet-foldable');
 
-  const dex = detectDeviceFormFactor(1920, 1080);
-  assert.equal(dex.formFactor, 'dex-desktop');
-  assert.equal(dex.label, 'DeX / Desktop PC');
-  assert.equal(dex.recommendedColumns, 5);
+  const desktop = detectDeviceFormFactor(1920, 1080);
+  assert.equal(desktop.formFactor, 'desktop');
+  assert.equal(desktop.label, 'Desktop / Large Display');
+  assert.equal(desktop.recommendedColumns, 5);
 });
 
 test('getThemeAwareAccentPair prevents black-on-red contrast bugs in Light, Reading, and Dark modes', () => {
@@ -400,3 +428,274 @@ test('Bangla and English papers have clickable semiChapters (Units, Prose, Poetr
     }
   }
 });
+
+test('G2 Continuous Curvature Profile provides squircle superellipse geometry for eye comfort', () => {
+  const g2Config = getCurveProfileConfig('g2');
+  assert.equal(g2Config.profile, 'g2');
+  assert.equal(g2Config.cornerShape, 'squircle');
+  assert.equal(g2Config.electronSmoothing, 1);
+  assert.equal(g2Config.eyeComfortScore, 10);
+  assert.ok(g2Config.description.includes('Superellipse'));
+
+  const classicConfig = getCurveProfileConfig('classic');
+  assert.equal(classicConfig.profile, 'classic');
+  assert.equal(classicConfig.cornerShape, 'round');
+  assert.equal(classicConfig.electronSmoothing, 0);
+  assert.equal(classicConfig.eyeComfortScore, 6);
+
+  assert.equal(cycleCurveProfile('g2'), 'classic');
+  assert.equal(cycleCurveProfile('classic'), 'g2');
+});
+
+test('4-Tier Role Governance: Main Admin, Secondary Admin, Moderator, and Reader permissions', () => {
+  const secAdmins = ['sec@webbooks.edu.bd'];
+  const moderators = ['mod@webbooks.edu.bd'];
+
+  assert.equal(
+    resolveUserRole(PRIMARY_ADMIN_EMAIL, secAdmins, moderators),
+    'main_admin'
+  );
+  assert.equal(
+    resolveUserRole('sec@webbooks.edu.bd', secAdmins, moderators),
+    'secondary_admin'
+  );
+  assert.equal(
+    resolveUserRole('mod@webbooks.edu.bd', secAdmins, moderators),
+    'moderator'
+  );
+  assert.equal(
+    resolveUserRole('student@gmail.com', secAdmins, moderators),
+    'reader'
+  );
+
+  // Moderator permissions: can submit content, requires approval first, cannot approve others
+  assert.equal(canSubmitTopicContent('moderator'), true);
+  assert.equal(doesContentRequireApproval('moderator'), true);
+  assert.equal(canApproveModeratorContent('moderator'), false);
+  assert.equal(canApproveModeratorRequests('moderator'), false);
+  assert.equal(canManageSecondaryAdmins('moderator'), false);
+
+  // Secondary Admin permissions: can submit directly, can approve Moderator content & Moderator requests, CANNOT manage Secondary Admins or touch Main Admin
+  assert.equal(canSubmitTopicContent('secondary_admin'), true);
+  assert.equal(doesContentRequireApproval('secondary_admin'), false);
+  assert.equal(canApproveModeratorContent('secondary_admin'), true);
+  assert.equal(canApproveModeratorRequests('secondary_admin'), true);
+  assert.equal(
+    canManageSecondaryAdmins('secondary_admin', 'sec@webbooks.edu.bd'),
+    false
+  );
+  assert.equal(canModifyMainAdmin(PRIMARY_ADMIN_EMAIL), false);
+  assert.equal(canModifyMainAdmin('sec@webbooks.edu.bd'), true);
+
+  // Main Admin permissions: exclusive authority over Secondary Admins, full approval rights, still cannot be deleted
+  assert.equal(
+    canManageSecondaryAdmins('main_admin', PRIMARY_ADMIN_EMAIL),
+    true
+  );
+  assert.equal(canApproveModeratorRequests('main_admin'), true);
+  assert.equal(canApproveModeratorContent('main_admin'), true);
+  assert.equal(canModifyMainAdmin(PRIMARY_ADMIN_EMAIL), false);
+});
+
+test('4-Mode Theme System: Auto-detects device appearance on first start and locks once user changes preference', () => {
+  // First start (not locked by user): follows device OS dark/light preference
+  assert.equal(resolveInitialTheme(null, false, true), 'oled');
+  assert.equal(resolveInitialTheme(null, false, false), 'light');
+
+  // Once user changes preference (locked = true): remembers user choice regardless of device OS
+  assert.equal(resolveInitialTheme('dark', true, false), 'dark');
+  assert.equal(resolveInitialTheme('yellow', true, true), 'yellow');
+  assert.equal(resolveInitialTheme('light', true, true), 'light');
+  assert.equal(resolveInitialTheme('oled', true, false), 'oled');
+
+  // Cycles cleanly across all 4 modes
+  assert.equal(cycleAppThemeMode('oled'), 'dark');
+  assert.equal(cycleAppThemeMode('dark'), 'yellow');
+  assert.equal(cycleAppThemeMode('yellow'), 'light');
+  assert.equal(cycleAppThemeMode('light'), 'oled');
+});
+
+test('Deep G2 Corner Curvature Radius presets provide deeper 38px and 46px squircle radii', () => {
+  const std = getCurveRadiusPx('standard');
+  const deep = getCurveRadiusPx('deep');
+  const ultra = getCurveRadiusPx('ultra');
+
+  assert.equal(std, 28);
+  assert.equal(deep, 38);
+  assert.equal(ultra, 46);
+  assert.ok(deep > std);
+  assert.ok(ultra > deep);
+});
+
+test('Version System: Semantic version comparison, pre-release detection, and app variant detection', () => {
+  // Variant detection across Android APK, Windows EXE, iOS, and Web
+  const winVariant = detectAppVariant('Mozilla/5.0 Electron/33.0.0', false, true, false);
+  assert.equal(winVariant.variant, 'windows-exe');
+  assert.equal(winVariant.platformFamily, 'Windows');
+
+  const androidApk = detectAppVariant('Mozilla/5.0 (Linux; Android 14; wv)', true, false, false);
+  assert.equal(androidApk.variant, 'android-apk');
+  assert.equal(androidApk.platformFamily, 'Android');
+
+  const iosWeb = detectAppVariant('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', false, false, true);
+  assert.equal(iosWeb.variant, 'ios-web');
+  assert.equal(iosWeb.platformFamily, 'iOS');
+
+  // Semver & Pre-release parsing
+  const stableVer = parseSemver('v1.0.1');
+  assert.equal(stableVer.isPrerelease, false);
+  assert.equal(stableVer.cleanTag, 'v1.0.1');
+
+  const betaVer = parseSemver('v1.1.0-beta.1');
+  assert.equal(betaVer.isPrerelease, true);
+  assert.equal(betaVer.prerelease, 'beta.1');
+
+  assert.equal(compareSemver('v1.0.1', '1.0.0'), 1);
+  assert.equal(compareSemver('v1.1.0', 'v1.1.0-beta.1'), 1);
+  assert.equal(compareSemver('v1.1.0-beta.1', 'v1.0.1'), 1);
+
+  // Release evaluation against current installed version baseline
+  const statusCurrent = evaluateReleaseUpdateStatus(APP_CURRENT_VERSION, FALLBACK_GITHUB_RELEASES, false);
+  assert.equal(statusCurrent.hasUpdate, false);
+  assert.equal(statusCurrent.hasStableUpdate, false);
+  assert.equal(statusCurrent.targetRelease.tagName, 'v1.0.1');
+  assert.equal(statusCurrent.repoUrl, GITHUB_REPO_URL);
+
+  // Dynamic newer release evaluation (e.g. When fetched live from GitHub API)
+  const mockReleases = [
+    {
+      tagName: 'v1.1.0-beta.1',
+      name: 'v1.1.0-beta.1',
+      htmlUrl: `${GITHUB_RELEASES_URL}`,
+      prerelease: true,
+      publishedAt: '2026-10-19T05:30:00Z',
+      assets: [],
+    },
+    {
+      tagName: 'v1.0.1',
+      name: 'v1.0.1',
+      htmlUrl: `${GITHUB_RELEASES_URL}/tag/v1.0.1`,
+      prerelease: false,
+      publishedAt: '2026-10-18T17:14:54Z',
+      assets: [],
+    },
+    ...FALLBACK_GITHUB_RELEASES,
+  ];
+
+  const statusStable = evaluateReleaseUpdateStatus('1.0.0', mockReleases, false);
+  assert.equal(statusStable.hasUpdate, true);
+  assert.equal(statusStable.hasStableUpdate, true);
+  assert.equal(statusStable.hasPrereleaseUpdate, true);
+  assert.equal(statusStable.targetRelease.tagName, 'v1.0.1');
+  assert.equal(statusStable.isTargetPrerelease, false);
+
+  // Pre-release Beta channel evaluation
+  const statusBeta = evaluateReleaseUpdateStatus('1.0.1', mockReleases, true);
+  assert.equal(statusBeta.hasUpdate, true);
+  assert.equal(statusBeta.isTargetPrerelease, true);
+  assert.equal(statusBeta.targetRelease.tagName, 'v1.1.0-beta.1');
+});
+
+test('Notifications System: Version update notifications redirect to Settings Version page and Approval notifications explain what was approved', () => {
+  const updateNotif = resolveNotificationTapAction({
+    id: 'notif-update-1',
+    category: 'version_update',
+    title: 'New Version v1.0.1 Available',
+    message: 'Tap to update Web Books on Android, Windows, or Web.',
+    targetAction: 'open_version_settings',
+    targetSection: 'version',
+    versionTag: 'v1.0.1',
+    createdAt: '2026-10-19T05:00:00Z',
+    read: false,
+  });
+  assert.equal(updateNotif.redirectView, 'settings');
+  assert.equal(updateNotif.settingsSection, 'version');
+  assert.equal(updateNotif.showApprovalBanner, false);
+
+  const approvalNotif = resolveNotificationTapAction({
+    id: 'notif-approval-1',
+    category: 'role_approval',
+    title: 'Approved: Moderator Permission',
+    message: 'Your Moderator request was approved.',
+    approvalSummary:
+      'You are now an Approved Moderator for Class 11-12 Chemistry! You can submit new topic pages for admin review.',
+    targetAction: 'show_approval_detail',
+    targetSection: 'account',
+    createdAt: '2026-10-19T05:10:00Z',
+    read: false,
+  });
+  assert.equal(approvalNotif.redirectView, 'approval_detail');
+  assert.equal(approvalNotif.showApprovalBanner, true);
+  assert.ok(approvalNotif.approvalDetails.includes('Approved Moderator'));
+});
+
+test('Web Books Brand Logo: SVG contains Digital Notebook and Web Globe with valid data URIs', () => {
+  assert.ok(
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('viewBox="0 0 512 512"'),
+    'Globe SVG must have 512x512 viewBox'
+  );
+  assert.ok(
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('rx="116"'),
+    'Framed icon must feature 116px squircle superellipse'
+  );
+  assert.ok(
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('x="86" y="76" width="340" height="360"'),
+    'Must include notebook card base'
+  );
+  assert.ok(
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('cx="256" cy="360" r="42"'),
+    'Must feature web globe outer circle'
+  );
+  assert.ok(
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('x1="214" y1="360" x2="298" y2="360"'),
+    'Must feature web globe equator line'
+  );
+
+  // Transparent mark
+  assert.ok(
+    WEB_BOOKS_MARK_SVG_RAW.includes('cx="256" cy="360" r="42"'),
+    'Mark SVG must feature web globe circle'
+  );
+  assert.equal(
+    WEB_BOOKS_MARK_SVG_RAW.includes('rx="116"'),
+    false,
+    'Mark SVG must NOT have a dark container squircle rect'
+  );
+
+  // Data URIs
+  const globeUri = getWebBooksGlobeDataUri();
+  assert.ok(globeUri.startsWith('data:image/svg+xml;utf8,'));
+  assert.ok(globeUri.includes('%3Csvg'));
+
+  const markUri = getWebBooksMarkDataUri();
+  assert.ok(markUri.startsWith('data:image/svg+xml;utf8,'));
+  assert.ok(markUri.includes('%3Csvg'));
+});
+
+test('User Manual & MIT License: Official License text is complete, valid, and attributed to Afeed (2026)', () => {
+  assert.ok(
+    OFFICIAL_MIT_LICENSE_TEXT.includes('MIT License'),
+    'Must declare MIT License'
+  );
+  assert.ok(
+    OFFICIAL_MIT_LICENSE_TEXT.includes('Copyright (c) 2026 Afeed'),
+    'Must include Copyright (c) 2026 Afeed notice'
+  );
+  assert.ok(
+    OFFICIAL_MIT_LICENSE_TEXT.includes('free of charge'),
+    'Must grant permission free of charge'
+  );
+  assert.ok(
+    OFFICIAL_MIT_LICENSE_TEXT.includes(
+      'The above copyright notice and this permission notice shall be included in all'
+    ),
+    'Must specify the attribution requirement to keep copyright in all copies'
+  );
+  assert.ok(
+    OFFICIAL_MIT_LICENSE_TEXT.includes('WITHOUT WARRANTY OF ANY KIND'),
+    'Must include standard open source warranty disclaimer'
+  );
+});
+
+
+

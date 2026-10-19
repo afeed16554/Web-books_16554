@@ -1121,7 +1121,7 @@ export type DeviceFormFactor =
   | 'phone'
   | 'passport-foldable'
   | 'tablet-foldable'
-  | 'dex-desktop';
+  | 'desktop';
 
 export interface AdaptiveLayoutProfile {
   formFactor: DeviceFormFactor;
@@ -1166,16 +1166,18 @@ export function detectDeviceFormFactor(
   }
 
   return {
-    formFactor: 'dex-desktop',
-    label: 'DeX / Desktop PC',
+    formFactor: 'desktop',
+    label: 'Desktop / Large Display',
     showCompactRailWhenCollapsed: true,
     recommendedColumns: safeW >= 1536 ? 5 : 4,
   };
 }
 
+export type AppThemeMode = 'oled' | 'dark' | 'yellow' | 'light';
+
 export function getThemeAwareAccentPair(
   hexColor: string,
-  theme: 'dark' | 'yellow' | 'light'
+  theme: AppThemeMode
 ): { fg: string; bgSoft: string; bannerBg: string; bannerFg: string } {
   const normalized = (hexColor || '#38bdf8').toLowerCase();
 
@@ -1192,7 +1194,7 @@ export function getThemeAwareAccentPair(
     '#8b5cf6': '#6d28d9',
   };
 
-  if (theme === 'dark') {
+  if (theme === 'dark' || theme === 'oled') {
     const needsWhiteOnDarkBanner = [
       '#ef4444',
       '#dc2626',
@@ -1216,6 +1218,37 @@ export function getThemeAwareAccentPair(
     bannerBg: deepColor,
     bannerFg: '#ffffff',
   };
+}
+
+/**
+ * Resolves the initial theme:
+ * - On first start (or when auto-detect is active and user hasn't locked a manual preference),
+ *   checks the user's device appearance (`systemPrefersDark`).
+ * - Once the user changes their preference (`userHasSetPreference === true`),
+ *   it stays exactly as the user set it across sessions.
+ */
+export function resolveInitialTheme(
+  savedTheme: string | null | undefined,
+  userHasSetPreference: boolean,
+  systemPrefersDark: boolean
+): AppThemeMode {
+  if (
+    userHasSetPreference &&
+    (savedTheme === 'oled' ||
+      savedTheme === 'dark' ||
+      savedTheme === 'yellow' ||
+      savedTheme === 'light')
+  ) {
+    return savedTheme;
+  }
+  return systemPrefersDark ? 'oled' : 'light';
+}
+
+export function cycleAppThemeMode(current: AppThemeMode): AppThemeMode {
+  if (current === 'oled') return 'dark';
+  if (current === 'dark') return 'yellow';
+  if (current === 'yellow') return 'light';
+  return 'oled';
 }
 
 export function clampViewingAreaScroll(
@@ -1255,3 +1288,564 @@ export function shouldEnableLowEndEfficiency(
   }
   return false;
 }
+
+export type CurveProfile = 'g2' | 'classic';
+export type CurveRadiusPreset = 'standard' | 'deep' | 'ultra';
+
+export interface CurveProfileConfig {
+  profile: CurveProfile;
+  label: string;
+  cornerShape: 'squircle' | 'round';
+  electronSmoothing: number;
+  description: string;
+  eyeComfortScore: number;
+  defaultRadiusPx: number;
+}
+
+export function getCurveRadiusPx(preset: CurveRadiusPreset): number {
+  if (preset === 'standard') return 28;
+  if (preset === 'ultra') return 46;
+  return 38; // 'deep' default — richer, more pronounced curveness
+}
+
+/**
+ * Returns configuration metadata for the selected corner curvature profile.
+ * G2 profile provides continuous curvature (squircle) with a deeper 38px default radius.
+ */
+export function getCurveProfileConfig(
+  profile: CurveProfile
+): CurveProfileConfig {
+  if (profile === 'g2') {
+    return {
+      profile: 'g2',
+      label: 'G2 Continuous Curve (Squircle)',
+      cornerShape: 'squircle',
+      electronSmoothing: 1,
+      description:
+        'Superellipse geometry (n=4) with continuous curvature derivative (dκ/ds = 0 at tangents) and deep 38px radius. Eliminates harsh corner pinch for maximum eye comfort.',
+      eyeComfortScore: 10,
+      defaultRadiusPx: 38,
+    };
+  }
+  return {
+    profile: 'classic',
+    label: 'Classic G1 (Circular Arc)',
+    cornerShape: 'round',
+    electronSmoothing: 0,
+    description:
+      'Traditional circular arc border-radius with standard 90° tangent step.',
+    eyeComfortScore: 6,
+    defaultRadiusPx: 28,
+  };
+}
+
+/**
+ * Cycles between G2 Continuous Curve and Classic G1.
+ */
+export function cycleCurveProfile(current: CurveProfile): CurveProfile {
+  return current === 'g2' ? 'classic' : 'g2';
+}
+
+/* =====================================================================
+   4-TIER ROLE GOVERNANCE & CONTENT MODERATION ENGINE
+   1. main_admin (fha16554@gmail.com): Immutable root owner. Only Main Admin
+      can accept/manage Secondary Admins. Cannot be removed or overridden.
+   2. secondary_admin: Can do everything a Moderator does + can approve
+      Moderator role requests and Moderator content submissions, but CANNOT
+      take over Main Admin or manage Secondary Admins.
+   3. moderator: Can submit new topic/chapter content, which enters the
+      Pending Content Queue first to be checked and approved by Main/Secondary Admin.
+   4. reader: Standard student/reader. Can submit feedback, ask questions,
+      and request Moderator or Secondary Admin permission.
+   ===================================================================== */
+export type UserRole =
+  | 'main_admin'
+  | 'secondary_admin'
+  | 'moderator'
+  | 'reader';
+
+export interface RolePermissionRequest {
+  id: string;
+  applicantUid: string;
+  applicantEmail: string;
+  applicantName: string;
+  requestedRole: 'moderator' | 'secondary_admin';
+  expertiseSubject: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  createdAt: string;
+}
+
+export interface PendingTopicSubmission {
+  id: string;
+  authorUid: string;
+  authorEmail: string;
+  authorName: string;
+  authorRole: UserRole;
+  page: LibraryTopicPage;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  createdAt: string;
+}
+
+export function resolveUserRole(
+  email: string | null | undefined,
+  secondaryAdminEmails: string[] = [],
+  moderatorEmails: string[] = [],
+  isFirestoreAdmin: boolean = false
+): UserRole {
+  if (!email || typeof email !== 'string') return 'reader';
+  const clean = email.trim().toLowerCase();
+  if (!clean) return 'reader';
+
+  if (clean === PRIMARY_ADMIN_EMAIL.toLowerCase()) {
+    return 'main_admin';
+  }
+
+  const normalizedSecondary = secondaryAdminEmails
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e && e !== PRIMARY_ADMIN_EMAIL.toLowerCase());
+  if (normalizedSecondary.includes(clean) || isFirestoreAdmin) {
+    return 'secondary_admin';
+  }
+
+  const normalizedModerators = moderatorEmails
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (normalizedModerators.includes(clean)) {
+    return 'moderator';
+  }
+
+  return 'reader';
+}
+
+/**
+ * Strictly ONLY the Main Admin (fha16554@gmail.com) can approve, add, or remove Secondary Admins.
+ * Secondary Admins can never promote anyone to Secondary Admin or take over Main Admin.
+ */
+export function canManageSecondaryAdmins(
+  role: UserRole,
+  email?: string | null
+): boolean {
+  if (role !== 'main_admin') return false;
+  if (!email) return false;
+  return email.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase();
+}
+
+/**
+ * Nobody can ever remove, demote, or take over the Main Admin account.
+ */
+export function canModifyMainAdmin(targetEmail: string): boolean {
+  if (!targetEmail) return false;
+  if (targetEmail.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase()) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Both Main Admin and Secondary Admins can approve/manage Moderator requests.
+ */
+export function canApproveModeratorRequests(role: UserRole): boolean {
+  return role === 'main_admin' || role === 'secondary_admin';
+}
+
+/**
+ * Both Main Admin and Secondary Admins can review and approve/reject Pending Content from Moderators.
+ */
+export function canApproveModeratorContent(role: UserRole): boolean {
+  return role === 'main_admin' || role === 'secondary_admin';
+}
+
+/**
+ * Main Admin, Secondary Admin, and Moderators can submit new topic content.
+ */
+export function canSubmitTopicContent(role: UserRole): boolean {
+  return (
+    role === 'main_admin' ||
+    role === 'secondary_admin' ||
+    role === 'moderator'
+  );
+}
+
+/**
+ * When a Moderator adds new content, it MUST be checked and approved first (`true`).
+ * Main Admin and Secondary Admin can publish directly (`false`).
+ */
+export function doesContentRequireApproval(role: UserRole): boolean {
+  return role === 'moderator';
+}
+
+// ============================================================================
+// APP VERSION, VARIANT DETECTION, GITHUB RELEASE & NOTIFICATION SYSTEM
+// ============================================================================
+
+export const APP_CURRENT_VERSION = '1.0.1';
+export const GITHUB_REPO_OWNER = 'afeed16554';
+export const GITHUB_REPO_NAME = 'Web-books_16554';
+export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
+export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
+export const GITHUB_RELEASES_API_URL = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases`;
+
+export type AppPlatformVariant =
+  | 'android-apk'
+  | 'windows-exe'
+  | 'ios-web'
+  | 'web-pwa';
+
+export interface AppVariantMetadata {
+  variant: AppPlatformVariant;
+  label: string;
+  shortBadge: string;
+  runtimeDescription: string;
+  platformFamily: 'Android' | 'Windows' | 'iOS' | 'Web';
+}
+
+export function detectAppVariant(
+  userAgent: string = '',
+  isCapacitorNative: boolean = false,
+  isElectronDesktop: boolean = false,
+  isStandalonePwa: boolean = false
+): AppVariantMetadata {
+  const ua = userAgent.toLowerCase();
+
+  if (isElectronDesktop || ua.includes('electron')) {
+    return {
+      variant: 'windows-exe',
+      label: 'Windows Desktop App (EXE)',
+      shortBadge: 'Windows EXE',
+      runtimeDescription: 'Native Electron Desktop Build (x64)',
+      platformFamily: 'Windows',
+    };
+  }
+
+  if (
+    isCapacitorNative ||
+    ua.includes('capacitor') ||
+    (ua.includes('android') && ua.includes('wv'))
+  ) {
+    return {
+      variant: 'android-apk',
+      label: 'Android Native App (APK)',
+      shortBadge: 'Android APK',
+      runtimeDescription: 'Capacitor Android Runtime Package',
+      platformFamily: 'Android',
+    };
+  }
+
+  if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) {
+    return {
+      variant: 'ios-web',
+      label: isStandalonePwa
+        ? 'iOS Home Screen App (PWA)'
+        : 'iOS Web App',
+      shortBadge: 'iOS Web / PWA',
+      runtimeDescription: 'Mobile WebKit & Home Screen Web App',
+      platformFamily: 'iOS',
+    };
+  }
+
+  if (ua.includes('android')) {
+    return {
+      variant: 'web-pwa',
+      label: isStandalonePwa
+        ? 'Android Installed Web App (PWA)'
+        : 'Android Mobile Web',
+      shortBadge: 'Android Web / PWA',
+      runtimeDescription: 'Progressive Web App & Offline Service Worker',
+      platformFamily: 'Android',
+    };
+  }
+
+  return {
+    variant: 'web-pwa',
+    label: isStandalonePwa
+      ? 'Desktop Installed Web App (PWA)'
+      : 'Web Browser Edition (PWA)',
+    shortBadge: 'Web / PWA',
+    runtimeDescription: 'Multi-Platform Web & Offline Service Worker',
+    platformFamily: 'Web',
+  };
+}
+
+export interface ParsedSemver {
+  major: number;
+  minor: number;
+  patch: number;
+  prerelease: string | null;
+  isPrerelease: boolean;
+  cleanTag: string;
+}
+
+export function parseSemver(versionStr: string): ParsedSemver {
+  const raw = (versionStr || '0.0.0').trim().replace(/^v/i, '');
+  const [corePart, ...preParts] = raw.split('-');
+  const prerelease = preParts.length > 0 ? preParts.join('-') : null;
+  const nums = (corePart || '0.0.0')
+    .split('.')
+    .map((n) => Number.parseInt(n, 10) || 0);
+  const major = nums[0] || 0;
+  const minor = nums[1] || 0;
+  const patch = nums[2] || 0;
+  return {
+    major,
+    minor,
+    patch,
+    prerelease,
+    isPrerelease: Boolean(prerelease),
+    cleanTag: `v${major}.${minor}.${patch}${prerelease ? `-${prerelease}` : ''}`,
+  };
+}
+
+/**
+ * Compares two semantic version strings (e.g. "v1.0.1" vs "1.0.0" or "v1.1.0-beta.1" vs "v1.1.0").
+ * Returns 1 if vA > vB, -1 if vA < vB, 0 if equal.
+ */
+export function compareSemver(vA: string, vB: string): number {
+  const a = parseSemver(vA);
+  const b = parseSemver(vB);
+
+  if (a.major !== b.major) return a.major > b.major ? 1 : -1;
+  if (a.minor !== b.minor) return a.minor > b.minor ? 1 : -1;
+  if (a.patch !== b.patch) return a.patch > b.patch ? 1 : -1;
+
+  // Same major.minor.patch: stable release is higher than prerelease (e.g. 1.1.0 > 1.1.0-beta.1)
+  if (!a.isPrerelease && b.isPrerelease) return 1;
+  if (a.isPrerelease && !b.isPrerelease) return -1;
+  if (a.prerelease && b.prerelease && a.prerelease !== b.prerelease) {
+    return a.prerelease.localeCompare(b.prerelease);
+  }
+  return 0;
+}
+
+export interface GitHubReleaseAssetInfo {
+  name: string;
+  browserDownloadUrl: string;
+  sizeBytes?: number;
+}
+
+export interface GitHubReleaseInfo {
+  tagName: string;
+  name: string;
+  htmlUrl: string;
+  prerelease: boolean;
+  publishedAt: string;
+  body?: string;
+  assets: GitHubReleaseAssetInfo[];
+}
+
+export interface ReleaseUpdateSummary {
+  currentVersionTag: string;
+  latestStable: GitHubReleaseInfo | null;
+  latestPrerelease: GitHubReleaseInfo | null;
+  targetRelease: GitHubReleaseInfo;
+  hasUpdate: boolean;
+  hasStableUpdate: boolean;
+  hasPrereleaseUpdate: boolean;
+  isTargetPrerelease: boolean;
+  apkDownloadUrl: string;
+  exeDownloadUrl: string;
+  releasePageUrl: string;
+  repoUrl: string;
+}
+
+export const FALLBACK_GITHUB_RELEASES: GitHubReleaseInfo[] = [
+  {
+    tagName: 'v1.0.1',
+    name: 'v1.0.1 — Multi-Platform Release & Curvature',
+    htmlUrl: `${GITHUB_RELEASES_URL}/tag/v1.0.1`,
+    prerelease: false,
+    publishedAt: '2026-10-18T17:15:35Z',
+    body: 'Official multi-platform release for Android APK, Windows Desktop EXE, and Web with Dex optimization.',
+    assets: [
+      {
+        name: 'app-debug.apk',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.1/app-debug.apk`,
+      },
+      {
+        name: 'Web.Books.Setup.1.0.0.exe',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.1/Web.Books.Setup.1.0.0.exe`,
+      },
+    ],
+  },
+  {
+    tagName: 'v1.0.0',
+    name: 'v1.0.0 — Initial Public Release',
+    htmlUrl: `${GITHUB_RELEASES_URL}/tag/v1.0.0`,
+    prerelease: false,
+    publishedAt: '2026-10-18T15:44:55Z',
+    body: 'Initial release of Web Books by Afeed.',
+    assets: [
+      {
+        name: 'app-debug.apk',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.0/app-debug.apk`,
+      },
+      {
+        name: 'Web.Books.Setup.1.0.0.exe',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.0/Web.Books.Setup.1.0.0.exe`,
+      },
+    ],
+  },
+];
+
+export function evaluateReleaseUpdateStatus(
+  currentVersion: string,
+  releases: GitHubReleaseInfo[] = FALLBACK_GITHUB_RELEASES,
+  preferPrereleaseChannel: boolean = false
+): ReleaseUpdateSummary {
+  const safeList =
+    Array.isArray(releases) && releases.length > 0
+      ? releases
+      : FALLBACK_GITHUB_RELEASES;
+
+  const sortedAll = [...safeList].sort((a, b) =>
+    compareSemver(b.tagName, a.tagName)
+  );
+  const stableList = sortedAll.filter(
+    (r) => !r.prerelease && !parseSemver(r.tagName).isPrerelease
+  );
+  const prereleaseList = sortedAll.filter(
+    (r) => r.prerelease || parseSemver(r.tagName).isPrerelease
+  );
+
+  const latestStable = stableList[0] || sortedAll[0] || null;
+  const latestPrerelease = prereleaseList[0] || null;
+
+  const hasStableUpdate = latestStable
+    ? compareSemver(latestStable.tagName, currentVersion) > 0
+    : false;
+  const hasPrereleaseUpdate = latestPrerelease
+    ? compareSemver(latestPrerelease.tagName, currentVersion) > 0
+    : false;
+
+  const targetRelease =
+    preferPrereleaseChannel && latestPrerelease
+      ? latestPrerelease
+      : latestStable || sortedAll[0];
+
+  const isTargetPrerelease = Boolean(
+    targetRelease.prerelease || parseSemver(targetRelease.tagName).isPrerelease
+  );
+  const hasUpdate = preferPrereleaseChannel
+    ? hasPrereleaseUpdate || hasStableUpdate
+    : hasStableUpdate;
+
+  const apkAsset = targetRelease.assets.find((a) =>
+    a.name.toLowerCase().endsWith('.apk')
+  );
+  const exeAsset = targetRelease.assets.find((a) =>
+    a.name.toLowerCase().endsWith('.exe')
+  );
+
+  return {
+    currentVersionTag: parseSemver(currentVersion).cleanTag,
+    latestStable,
+    latestPrerelease,
+    targetRelease,
+    hasUpdate,
+    hasStableUpdate,
+    hasPrereleaseUpdate,
+    isTargetPrerelease,
+    apkDownloadUrl: apkAsset?.browserDownloadUrl || GITHUB_RELEASES_URL,
+    exeDownloadUrl: exeAsset?.browserDownloadUrl || GITHUB_RELEASES_URL,
+    releasePageUrl: targetRelease.htmlUrl || GITHUB_RELEASES_URL,
+    repoUrl: GITHUB_REPO_URL,
+  };
+}
+
+export type AppNotificationCategory =
+  | 'version_update'
+  | 'prerelease_update'
+  | 'role_approval'
+  | 'content_approval';
+
+export interface AppNotificationItem {
+  id: string;
+  category: AppNotificationCategory;
+  title: string;
+  message: string;
+  approvalSummary?: string;
+  targetAction:
+    | 'open_version_settings'
+    | 'open_admin_settings'
+    | 'open_profile_settings'
+    | 'open_reader_topic'
+    | 'show_approval_detail';
+  targetSection?:
+    | 'account'
+    | 'theme'
+    | 'visual'
+    | 'version'
+    | 'faq'
+    | 'admin'
+    | 'manual';
+  targetTopicId?: string;
+  releaseUrl?: string;
+  versionTag?: string;
+  isPrerelease?: boolean;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface NotificationTapResolution {
+  redirectView: 'settings' | 'reader' | 'approval_detail';
+  settingsSection:
+    | 'account'
+    | 'theme'
+    | 'visual'
+    | 'version'
+    | 'faq'
+    | 'admin'
+    | 'manual';
+  showApprovalBanner: boolean;
+  approvalTitle: string;
+  approvalDetails: string;
+  targetTopicId?: string;
+}
+
+/**
+ * Pure resolver for notification clicks:
+ * - Version / Update / App setting change notifications redirect directly to the corresponding Settings section (e.g. 'version').
+ * - Normal Approval notifications (Role approval or Content approval) tell the user what they were approved for and allow navigating to the relevant page.
+ */
+export function resolveNotificationTapAction(
+  notification: AppNotificationItem
+): NotificationTapResolution {
+  if (
+    notification.category === 'version_update' ||
+    notification.category === 'prerelease_update' ||
+    notification.targetAction === 'open_version_settings'
+  ) {
+    return {
+      redirectView: 'settings',
+      settingsSection: notification.targetSection || 'version',
+      showApprovalBanner: false,
+      approvalTitle: '',
+      approvalDetails: '',
+    };
+  }
+
+  if (notification.targetAction === 'open_admin_settings') {
+    return {
+      redirectView: 'settings',
+      settingsSection: 'admin',
+      showApprovalBanner: Boolean(notification.approvalSummary),
+      approvalTitle: notification.title,
+      approvalDetails: notification.approvalSummary || notification.message,
+    };
+  }
+
+  // Normal approval notifications: tell the user what they are approved for!
+  return {
+    redirectView: notification.targetTopicId ? 'reader' : 'approval_detail',
+    settingsSection: notification.targetSection || 'account',
+    showApprovalBanner: true,
+    approvalTitle: notification.title,
+    approvalDetails: notification.approvalSummary || notification.message,
+    targetTopicId: notification.targetTopicId,
+  };
+}
+
+
+

@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Web Books by Afeed",
   "short_name": "Web Books",
-  "description": "Clean, distraction-free Samsung One UI digital concept reader and notebook with KaTeX mhchem, adaptive chemistry SVGs, and OLED Dark Mode.",
+  "description": "Clean, distraction-free Android Dex digital concept reader and notebook with KaTeX mhchem, adaptive chemistry SVGs, and Dark Mode.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

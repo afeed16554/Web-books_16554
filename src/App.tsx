@@ -26,12 +26,22 @@ import {
 } from './firebase';
 import {
   ALL_CLASS_LEVELS,
+  AppThemeMode,
   BUILT_IN_PAGES,
   buildFolderHierarchy,
+  canApproveModeratorContent,
+  canApproveModeratorRequests,
+  canManageSecondaryAdmins,
+  canModifyMainAdmin,
+  canSubmitTopicContent,
   ChapterItem,
   clampViewingAreaScroll,
   computeViewingAreaCollapseState,
+  CurveProfile,
+  CurveRadiusPreset,
+  cycleAppThemeMode,
   detectDeviceFormFactor,
+  doesContentRequireApproval,
   EfficiencyOverrideMode,
   extractMainTopicsFromHtml,
   FolderNode,
@@ -42,16 +52,43 @@ import {
   isAuthorizedAdminEmail,
   LibraryTopicPage,
   normalizeClassName,
+  PendingTopicSubmission,
   PRIMARY_ADMIN_EMAIL,
+  resolveInitialTheme,
+  resolveUserRole,
+  RolePermissionRequest,
   SemiChapterItem,
   shouldEnableLowEndEfficiency,
   splitSubjectsByCategory,
   SubjectPaperCard,
+  APP_CURRENT_VERSION,
+  AppNotificationItem,
+  detectAppVariant,
+  evaluateReleaseUpdateStatus,
+  FALLBACK_GITHUB_RELEASES,
+  GitHubReleaseInfo,
+  GITHUB_RELEASES_API_URL,
+  GITHUB_RELEASES_URL,
+  resolveNotificationTapAction,
 } from './utils/libraryCatalog';
+import { Bell, BellRing } from 'lucide-react';
 import {
   getAllSectionsHtml,
   getBatch5NavigationLinksHtml,
 } from './utils/chemistrySections';
+import {
+  SettingsPage,
+  SettingsSectionId,
+  VisualAnimationSettings,
+} from './components/SettingsPage';
+import {
+  WebBooksLogo,
+  useSyncWebBooksFavicon,
+} from './components/WebBooksLogo';
+import {
+  NotificationsCenter,
+  dispatchSystemPushNotification,
+} from './components/NotificationsCenter';
 
 declare global {
   interface Window {
@@ -71,10 +108,8 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
-type ThemeMode = 'dark' | 'yellow' | 'light';
 type ViewMode = 'home' | 'reader';
 type HomeDrillStage = 'subjects' | 'chapters' | 'topics';
-type SettingsTab = 'display' | 'account' | 'feedback' | 'admin' | 'manual';
 
 interface FeedbackRecord {
   id: string;
@@ -89,12 +124,19 @@ interface FeedbackRecord {
 
 const LOCAL_CUSTOM_TOPICS_KEY = 'chem_reader_custom_topics_v1';
 const LOCAL_THEME_KEY = 'organic_note_theme_v1';
+const LOCAL_THEME_USER_LOCKED_KEY = 'web_books_theme_user_locked_v1';
 const LOCAL_FONT_SCALE_KEY = 'organic_note_font_scale_v1';
 const LOCAL_STUDENT_CLASS_KEY = 'organic_note_student_class_v1';
 const LOCAL_STUDENT_SCHOOL_KEY = 'organic_note_student_school_v1';
 const LOCAL_STUDENT_PHONE_KEY = 'organic_note_student_phone_v1';
 const LOCAL_ADMIN_EMAILS_KEY = 'organic_note_selective_admins_v1';
+const LOCAL_MODERATOR_EMAILS_KEY = 'web_books_moderator_emails_v1';
+const LOCAL_ROLE_REQUESTS_KEY = 'web_books_role_requests_v1';
+const LOCAL_PENDING_SUBMISSIONS_KEY = 'web_books_pending_submissions_v1';
 const LOCAL_EFFICIENCY_MODE_KEY = 'web_books_efficiency_mode_v1';
+const LOCAL_VISUAL_SETTINGS_KEY = 'web_books_visual_settings_v1';
+export const LOCAL_CURVE_PROFILE_KEY = 'web_books_curve_profile_v1';
+export const LOCAL_CURVE_RADIUS_KEY = 'web_books_curve_radius_v1';
 
 /**
  * Custom Sidebar Toggle Icon:
@@ -234,18 +276,73 @@ export default function App() {
   const [foldersExpandedInSidebar, setFoldersExpandedInSidebar] =
     useState<boolean>(true);
 
-  // Persistent Display Mode & Font Scale (Remembers user preference in localStorage; defaults to OLED Dark '#000000')
-  const [theme, setTheme] = useState<ThemeMode>(() => {
+  // Auto-detect device appearance on first start; once user changes preference, lock and remember it
+  const [isThemeAutoDetect, setIsThemeAutoDetect] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LOCAL_THEME_USER_LOCKED_KEY) !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  // 4 Appearance Modes: 'oled' (OLED Dark #000), 'dark' (Soft Dark Slate), 'yellow' (Warm Reading), 'light' (Clean Light)
+  const [theme, setTheme] = useState<AppThemeMode>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_THEME_KEY);
-      if (saved === 'dark' || saved === 'yellow' || saved === 'light') {
-        return saved;
-      }
+      const userLocked =
+        localStorage.getItem(LOCAL_THEME_USER_LOCKED_KEY) === 'true';
+      const systemPrefersDark =
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function'
+          ? window.matchMedia('(prefers-color-scheme: dark)').matches
+          : true;
+      return resolveInitialTheme(saved, userLocked, systemPrefersDark);
+    } catch {
+      return 'oled';
+    }
+  });
+
+  const handleSelectTheme = (nextMode: AppThemeMode) => {
+    setTheme(nextMode);
+    setIsThemeAutoDetect(false);
+    try {
+      localStorage.setItem(LOCAL_THEME_USER_LOCKED_KEY, 'true');
+      localStorage.setItem(LOCAL_THEME_KEY, nextMode);
     } catch {
       // ignore storage errors
     }
-    return 'dark';
-  });
+  };
+
+  const handleEnableThemeAutoDetect = () => {
+    setIsThemeAutoDetect(true);
+    const systemPrefersDark =
+      typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        : true;
+    const resolved: AppThemeMode = systemPrefersDark ? 'oled' : 'light';
+    setTheme(resolved);
+    try {
+      localStorage.setItem(LOCAL_THEME_USER_LOCKED_KEY, 'false');
+      localStorage.setItem(LOCAL_THEME_KEY, resolved);
+    } catch {
+      // ignore storage errors
+    }
+    showShortcutToast(
+      `Auto-Detect Active (${resolved === 'oled' ? 'OLED Dark' : 'Light'})`
+    );
+  };
+
+  // Listen to OS appearance changes while Auto-Detect is active
+  useEffect(() => {
+    if (!isThemeAutoDetect || typeof window === 'undefined' || !window.matchMedia)
+      return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = (e: MediaQueryListEvent) => {
+      setTheme(e.matches ? 'oled' : 'light');
+    };
+    mq.addEventListener?.('change', listener);
+    return () => mq.removeEventListener?.('change', listener);
+  }, [isThemeAutoDetect]);
 
   const [fontScale, setFontScale] = useState<number>(() => {
     try {
@@ -257,15 +354,75 @@ export default function App() {
     return 18;
   });
 
+  // Corner Curvature Profile: G2 Continuous Curve (Squircle) vs Classic G1 (Circular Arc)
+  const [curveProfile, setCurveProfile] = useState<CurveProfile>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_CURVE_PROFILE_KEY);
+      if (saved === 'g2' || saved === 'classic') return saved;
+    } catch {
+      // ignore storage errors
+    }
+    return 'g2'; // Default to G2 Continuous Curve for enhanced eye comfort
+  });
+
+  // Corner Radius Depth Preset ('standard' = 28px, 'deep' = 38px default, 'ultra' = 46px)
+  const [curveRadiusPreset, setCurveRadiusPreset] =
+    useState<CurveRadiusPreset>(() => {
+      try {
+        const saved = localStorage.getItem(LOCAL_CURVE_RADIUS_KEY);
+        if (saved === 'standard' || saved === 'deep' || saved === 'ultra') {
+          return saved;
+        }
+      } catch {
+        // ignore storage errors
+      }
+      return 'deep';
+    });
+
+  // Granular Visual & Animation Management (Default: Auto-Detect)
+  const [visualSettings, setVisualSettings] =
+    useState<VisualAnimationSettings>(() => {
+      try {
+        const saved = localStorage.getItem(LOCAL_VISUAL_SETTINGS_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved) as VisualAnimationSettings;
+          if (parsed && (parsed.mode === 'auto' || parsed.mode === 'custom')) {
+            return parsed;
+          }
+        }
+      } catch {
+        // ignore storage errors
+      }
+      return {
+        mode: 'auto',
+        reduceAnimation: false,
+        reduceBlur: false,
+        reduceTransition: false,
+      };
+    });
+
   const [allDropdownsOpen, setAllDropdownsOpen] = useState<boolean>(false);
 
-  // Header corner popovers / modals
+  // Header corner popovers / full-screen Settings Page
   const [quickTopicOpen, setQuickTopicOpen] = useState<boolean>(false);
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>('display');
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSectionId>('account');
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState<boolean>(false);
+  const [shortcutToast, setShortcutToast] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
 
-  // Admin Upload / Editor Modal & Code Export Modal (Admin Only)
+  const showShortcutToast = (msg: string) => {
+    setShortcutToast(msg);
+    if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setShortcutToast(null);
+    }, 1400);
+  };
+
+  // Admin / Moderator Upload Modal & Code Export Modal
   const [uploadModalOpen, setUploadModalOpen] = useState<boolean>(false);
   const [rawCodeModalOpen, setRawCodeModalOpen] = useState<boolean>(false);
 
@@ -324,7 +481,6 @@ export default function App() {
   const [profileStatusMsg, setProfileStatusMsg] = useState<string>('');
 
   // Drill-down & Filter states: Class -> Subject + Paper -> Chapter -> Topic
-  // When the student has configured their class in their profile/device, default directly to their class so they only see their class's subjects
   const [selectedClass, setSelectedClass] = useState<string>(() => {
     try {
       const savedClass = localStorage.getItem(LOCAL_STUDENT_CLASS_KEY);
@@ -351,12 +507,14 @@ export default function App() {
     'class-11-12-chem-2nd': true,
   });
 
-  // Firebase Auth & Selective Admin state
+  // Firebase Auth & 4-Tier Role Governance state (Main Admin, Secondary Admin, Moderator, Reader)
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string>('');
   const [isFirestoreAdminDoc, setIsFirestoreAdminDoc] =
     useState<boolean>(false);
+
+  // Secondary Admin emails (Main Admin fha16554@gmail.com is always preserved at root)
   const [selectiveAdminEmails, setSelectiveAdminEmails] = useState<string[]>(
     () => {
       try {
@@ -367,15 +525,85 @@ export default function App() {
       }
     }
   );
-  const [newAdminEmailInput, setNewAdminEmailInput] = useState<string>('');
+
+  // Approved Moderator emails (Production-ready: starts empty with no demo emails)
+  const [moderatorEmails, setModeratorEmails] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_MODERATOR_EMAILS_KEY);
+      if (saved) {
+        const parsed = (JSON.parse(saved) as string[]).filter(
+          (e) => e && e.toLowerCase() !== 'moderator.hsc@gmail.com'
+        );
+        localStorage.setItem(
+          LOCAL_MODERATOR_EMAILS_KEY,
+          JSON.stringify(parsed)
+        );
+        return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  // Role Permission Requests Queue (Moderator & Secondary Admin requests — no demo requests)
+  const [roleRequests, setRoleRequests] = useState<RolePermissionRequest[]>(
+    () => {
+      try {
+        const saved = localStorage.getItem(LOCAL_ROLE_REQUESTS_KEY);
+        if (saved) {
+          const parsed = (JSON.parse(saved) as RolePermissionRequest[]).filter(
+            (r) =>
+              r &&
+              r.id !== 'req-mod-sample-1' &&
+              r.applicantEmail !== 'nafis.hsc@gmail.com'
+          );
+          localStorage.setItem(LOCAL_ROLE_REQUESTS_KEY, JSON.stringify(parsed));
+          return parsed;
+        }
+      } catch {
+        // ignore
+      }
+      return [];
+    }
+  );
+
+  // Pending Moderator Content Submissions Queue (Requires Main Admin or Secondary Admin approval before publishing — no demo drafts)
+  const [pendingSubmissions, setPendingSubmissions] = useState<
+    PendingTopicSubmission[]
+  >(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_PENDING_SUBMISSIONS_KEY);
+      if (saved) {
+        const parsed = (JSON.parse(saved) as PendingTopicSubmission[]).filter(
+          (s) => s && s.id !== 'sub-mod-sample-1'
+        );
+        localStorage.setItem(
+          LOCAL_PENDING_SUBMISSIONS_KEY,
+          JSON.stringify(parsed)
+        );
+        return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  const userRole = useMemo(
+    () =>
+      resolveUserRole(
+        user?.email,
+        selectiveAdminEmails,
+        moderatorEmails,
+        isFirestoreAdminDoc
+      ),
+    [user?.email, selectiveAdminEmails, moderatorEmails, isFirestoreAdminDoc]
+  );
 
   const isAdminUser = useMemo(() => {
-    if (!user) return false;
-    return (
-      isFirestoreAdminDoc ||
-      isAuthorizedAdminEmail(user.email, selectiveAdminEmails)
-    );
-  }, [user, isFirestoreAdminDoc, selectiveAdminEmails]);
+    return userRole === 'main_admin' || userRole === 'secondary_admin';
+  }, [userRole]);
 
   // Feedback state
   const [feedbackRating, setFeedbackRating] = useState<number>(5);
@@ -384,7 +612,7 @@ export default function App() {
   const [feedbackStatusMsg, setFeedbackStatusMsg] = useState<string>('');
   const [myFeedbacks, setMyFeedbacks] = useState<FeedbackRecord[]>([]);
 
-  // Admin Upload / Build New Topic Page form state
+  // Admin / Moderator Upload / Build New Topic Page form state
   const [newPageClass, setNewPageClass] = useState<string>(
     'Class 11-12 (HSC)'
   );
@@ -409,6 +637,303 @@ export default function App() {
     }
     return computeViewingAreaCollapseState(scrollY, 110);
   }, [scrollY, manualViewingCollapsed]);
+
+  // Sync favicon with the new Web Books Globe icon across Web, Android, and iOS
+  useSyncWebBooksFavicon();
+
+  // App Variant Detection (Android APK, Windows EXE, iOS Web, Web PWA)
+  const appVariant = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return detectAppVariant('', false, false, false);
+    }
+    const winAny = window as unknown as {
+      Capacitor?: { isNativePlatform?: () => boolean };
+      process?: { versions?: { electron?: string } };
+    };
+    const isCap = Boolean(winAny.Capacitor?.isNativePlatform?.());
+    const isElec = Boolean(winAny.process?.versions?.electron);
+    const isStandalone =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(display-mode: standalone)').matches;
+    return detectAppVariant(
+      window.navigator.userAgent,
+      isCap,
+      isElec,
+      isStandalone
+    );
+  }, []);
+
+  // Version & GitHub Releases State
+  const [releasesList, setReleasesList] = useState<GitHubReleaseInfo[]>(
+    FALLBACK_GITHUB_RELEASES
+  );
+  const [preferPrerelease, setPreferPrerelease] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('wb_prefer_prerelease_v1') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [checkingUpdates, setCheckingUpdates] = useState<boolean>(false);
+  const [lastCheckedAt, setLastCheckedAt] = useState<string>('Just now');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'wb_prefer_prerelease_v1',
+        preferPrerelease ? 'true' : 'false'
+      );
+    } catch {
+      // ignore
+    }
+  }, [preferPrerelease]);
+
+  const releaseSummary = useMemo(
+    () =>
+      evaluateReleaseUpdateStatus(
+        APP_CURRENT_VERSION,
+        releasesList,
+        preferPrerelease
+      ),
+    [releasesList, preferPrerelease]
+  );
+
+  // Notifications Center State (Popover, Expanded Modal, Approval Detail Dialog, Push Permission)
+  const [notificationsPopoverOpen, setNotificationsPopoverOpen] =
+    useState<boolean>(false);
+  const [notificationsExpandedOpen, setNotificationsExpandedOpen] =
+    useState<boolean>(false);
+  const [activeApprovalDetail, setActiveApprovalDetail] = useState<{
+    title: string;
+    details: string;
+    category: string;
+    targetSection?: SettingsSectionId;
+    targetTopicId?: string;
+  } | null>(null);
+  const [pushPermission, setPushPermission] = useState<
+    NotificationPermission | 'unsupported'
+  >(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'unsupported';
+  });
+
+  const [notifications, setNotifications] = useState<AppNotificationItem[]>(
+    () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('wb_notifications_v1');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              // Strip out any legacy demo or test notifications
+              return parsed.filter(
+                (n: AppNotificationItem) =>
+                  n &&
+                  !n.id.startsWith('notif-seed-') &&
+                  !n.id.startsWith('notif-release-v1.') &&
+                  n.id !== 'notif-release-v1.0.1' &&
+                  n.id !== 'notif-prerelease-v1.1.0-beta.1' &&
+                  n.id !== 'notif-approval-role-status' &&
+                  n.id !== 'wb-push-test' &&
+                  !n.id.includes('demo') &&
+                  !n.title?.toLowerCase().includes('demo') &&
+                  !n.title?.toLowerCase().includes('test push')
+              );
+            }
+          }
+        }
+      } catch {
+        // ignore storage errors
+      }
+      return [];
+    }
+  );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'wb_notifications_v1',
+        JSON.stringify(notifications)
+      );
+    } catch {
+      // ignore
+    }
+  }, [notifications]);
+
+  const unreadNotificationsCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  );
+
+  const pushNotificationItem = (newItem: AppNotificationItem) => {
+    setNotifications((prev) => {
+      const exists = prev.some((n) => n.id === newItem.id);
+      if (exists) {
+        return prev.map((n) => (n.id === newItem.id ? newItem : n));
+      }
+      return [newItem, ...prev];
+    });
+    void dispatchSystemPushNotification(
+      newItem.title,
+      newItem.approvalSummary || newItem.message,
+      newItem.id
+    );
+  };
+
+  const handleRequestPushPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      showShortcutToast('System Push Notifications not supported in this frame');
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      setPushPermission(perm);
+      if (perm === 'granted') {
+        await dispatchSystemPushNotification(
+          'Web Books Notifications Enabled',
+          `You will receive version updates (${releaseSummary.targetRelease.tagName}) and approval alerts on ${appVariant.shortBadge}.`,
+          'wb-push-test'
+        );
+        showShortcutToast(`Push Notifications Active (${appVariant.shortBadge})`);
+      } else {
+        showShortcutToast('Push permission not granted by browser');
+      }
+    } catch {
+      showShortcutToast('Enable Push Notifications in browser site settings');
+    }
+  };
+
+  const handleCheckForUpdates = async (silent: boolean = false) => {
+    if (!silent) setCheckingUpdates(true);
+    try {
+      const res = await fetch(GITHUB_RELEASES_API_URL, {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+      if (res.ok) {
+        const raw = await res.json();
+        if (Array.isArray(raw) && raw.length > 0) {
+          const mapped: GitHubReleaseInfo[] = raw.map(
+            (r: {
+              tag_name?: string;
+              name?: string;
+              html_url?: string;
+              prerelease?: boolean;
+              published_at?: string;
+              body?: string;
+              assets?: Array<{
+                name?: string;
+                browser_download_url?: string;
+                size?: number;
+              }>;
+            }) => ({
+              tagName: r.tag_name || 'v1.0.1',
+              name: r.name || r.tag_name || 'Release',
+              htmlUrl: r.html_url || GITHUB_RELEASES_URL,
+              prerelease: Boolean(r.prerelease),
+              publishedAt: r.published_at || new Date().toISOString(),
+              body:
+                r.body ||
+                'Multi-platform release for Android APK, Windows Desktop EXE, and Web.',
+              assets: Array.isArray(r.assets)
+                ? r.assets.map((a) => ({
+                    name: a.name || 'binary',
+                    browserDownloadUrl:
+                      a.browser_download_url || GITHUB_RELEASES_URL,
+                    sizeBytes: a.size,
+                  }))
+                : [],
+            })
+          );
+          // Preserve our Pre-release Beta entry if GitHub only returned stable tags so Beta channel is always testable
+          const hasBeta = mapped.some((m) => m.prerelease);
+          const fallbackBeta = FALLBACK_GITHUB_RELEASES.find(
+            (f) => f.prerelease
+          );
+          const combined =
+            !hasBeta && fallbackBeta ? [...mapped, fallbackBeta] : mapped;
+          setReleasesList(combined);
+
+          const summary = evaluateReleaseUpdateStatus(
+            APP_CURRENT_VERSION,
+            combined,
+            preferPrerelease
+          );
+          if (summary.hasUpdate && !silent) {
+            pushNotificationItem({
+              id: `notif-release-${summary.targetRelease.tagName}`,
+              category: summary.isTargetPrerelease
+                ? 'prerelease_update'
+                : 'version_update',
+              title: summary.isTargetPrerelease
+                ? `Pre-release Beta ${summary.targetRelease.tagName} Available`
+                : `New Version ${summary.targetRelease.tagName} Available`,
+              message: `Version ${summary.targetRelease.tagName} is available on GitHub for ${appVariant.shortBadge}. Tap to update now.`,
+              targetAction: 'open_version_settings',
+              targetSection: 'version',
+              releaseUrl: summary.releasePageUrl,
+              versionTag: summary.targetRelease.tagName,
+              isPrerelease: summary.isTargetPrerelease,
+              createdAt: new Date().toISOString(),
+              read: false,
+            });
+          }
+        }
+      }
+      setLastCheckedAt(
+        new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
+      if (!silent) {
+        showShortcutToast('Checked GitHub Releases for Updates');
+      }
+    } catch {
+      if (!silent) {
+        showShortcutToast('Using cached GitHub release metadata');
+      }
+    } finally {
+      if (!silent) setCheckingUpdates(false);
+    }
+  };
+
+  // Check GitHub releases once on mount
+  useEffect(() => {
+    void handleCheckForUpdates(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSelectNotification = (item: AppNotificationItem) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+    );
+    const resolution = resolveNotificationTapAction(item);
+
+    setNotificationsPopoverOpen(false);
+    setNotificationsExpandedOpen(false);
+
+    if (resolution.redirectView === 'settings') {
+      setSettingsSection(resolution.settingsSection);
+      setSettingsOpen(true);
+      showShortcutToast(
+        resolution.settingsSection === 'version'
+          ? 'Opened App Version & Updates'
+          : `Opened Settings: ${resolution.settingsSection}`
+      );
+      return;
+    }
+
+    // For normal approval notifications: tell the user what they are approved for!
+    setActiveApprovalDetail({
+      title: resolution.approvalTitle,
+      details: resolution.approvalDetails,
+      category: item.category,
+      targetSection: resolution.settingsSection,
+      targetTopicId: resolution.targetTopicId,
+    });
+  };
 
   // Low-End Device Efficiency Mode ('auto' | 'enabled' | 'disabled')
   const [efficiencyMode, setEfficiencyMode] = useState<EfficiencyOverrideMode>(
@@ -455,7 +980,44 @@ export default function App() {
     );
   }, [efficiencyMode, isLowEndEfficiencyActive]);
 
-  // Adaptive Form Factor detection (Phone, Passport Foldable, Tablet/Book Foldable, DeX / Desktop PC)
+  // Apply granular visual & animation reduction attributes on documentElement
+  useEffect(() => {
+    const effectiveReduceAnim =
+      visualSettings.mode === 'auto'
+        ? isLowEndEfficiencyActive
+        : visualSettings.reduceAnimation;
+    const effectiveReduceBlur =
+      visualSettings.mode === 'auto'
+        ? isLowEndEfficiencyActive
+        : visualSettings.reduceBlur;
+    const effectiveReduceTrans =
+      visualSettings.mode === 'auto'
+        ? isLowEndEfficiencyActive
+        : visualSettings.reduceTransition;
+
+    document.documentElement.setAttribute(
+      'data-reduce-animation',
+      effectiveReduceAnim ? 'true' : 'false'
+    );
+    document.documentElement.setAttribute(
+      'data-reduce-blur',
+      effectiveReduceBlur ? 'true' : 'false'
+    );
+    document.documentElement.setAttribute(
+      'data-reduce-transition',
+      effectiveReduceTrans ? 'true' : 'false'
+    );
+    try {
+      localStorage.setItem(
+        LOCAL_VISUAL_SETTINGS_KEY,
+        JSON.stringify(visualSettings)
+      );
+    } catch {
+      // ignore
+    }
+  }, [visualSettings, isLowEndEfficiencyActive]);
+
+  // Adaptive Form Factor detection (Phone, Passport Foldable, Tablet/Book Foldable, Desktop / Large Display)
   const [viewportSize, setViewportSize] = useState<{
     width: number;
     height: number;
@@ -469,7 +1031,7 @@ export default function App() {
     [viewportSize.width, viewportSize.height]
   );
 
-  // Adaptive grid columns helper for Passport Foldables, Tablets, Phones, and DeX / Desktop PC
+  // Adaptive grid columns helper for Passport Foldables, Tablets, Phones, and Desktops
   const adaptiveHomeGridClass = useMemo(() => {
     if (deviceProfile.formFactor === 'passport-foldable') {
       return 'grid grid-cols-2 gap-3.5';
@@ -491,8 +1053,6 @@ export default function App() {
   const [copiedCmd, setCopiedCmd] = useState<string>('');
 
   // rAF-throttled & clamped scroll listener:
-  // Only updates state within the top [0, 120px] collapse range in Home mode,
-  // preventing unnecessary React re-renders during deep page scrolling on low-end devices.
   useEffect(() => {
     if (viewMode !== 'home') return;
     let rafId: number | null = null;
@@ -562,10 +1122,16 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Apply and persist theme (OLED Dark, Reading Sepia, Light)
+  // Apply and persist theme (OLED Dark, Soft Dark, Warm Reading, Clean Light)
   useEffect(() => {
     const themeAttr =
-      theme === 'dark' ? 'oled' : theme === 'yellow' ? 'reading' : 'light';
+      theme === 'oled'
+        ? 'oled'
+        : theme === 'dark'
+        ? 'dark'
+        : theme === 'yellow'
+        ? 'reading'
+        : 'light';
     document.documentElement.setAttribute('data-theme', themeAttr);
     try {
       localStorage.setItem(LOCAL_THEME_KEY, theme);
@@ -586,6 +1152,28 @@ export default function App() {
       // ignore storage errors
     }
   }, [fontScale]);
+
+  // Apply and persist G2 Curvature profile and Radius depth on documentElement
+  useEffect(() => {
+    document.documentElement.setAttribute('data-curve', curveProfile);
+    try {
+      localStorage.setItem(LOCAL_CURVE_PROFILE_KEY, curveProfile);
+    } catch {
+      // ignore storage errors
+    }
+  }, [curveProfile]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute(
+      'data-curve-radius',
+      curveRadiusPreset
+    );
+    try {
+      localStorage.setItem(LOCAL_CURVE_RADIUS_KEY, curveRadiusPreset);
+    } catch {
+      // ignore storage errors
+    }
+  }, [curveRadiusPreset]);
 
   // Expose window.togglePanel for legacy <a class="topic-link" onclick="togglePanel('topic-panel')"> links
   useEffect(() => {
@@ -1055,11 +1643,15 @@ export default function App() {
     }
   };
 
-  // Admin Only: Create / Upload New Topic Page
+  // Admin & Moderator: Create / Submit New Topic Page
+  // - If Moderator: Enters Pending Content Approval Queue first to be checked & approved by Main/Secondary Admin.
+  // - If Main Admin or Secondary Admin: Publishes directly.
   const handleCreateTopicPage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdminUser) {
-      setUploadStatusMsg('Only authorized admins can add new topic pages.');
+    if (!canSubmitTopicContent(userRole)) {
+      setUploadStatusMsg(
+        'Only Approved Moderators, Secondary Admins, and the Main Admin can submit topic pages.'
+      );
       return;
     }
     const cleanTitle = newPageTitle.trim();
@@ -1090,6 +1682,37 @@ export default function App() {
           : [{ id: 'top', title: cleanTitle }],
       folderColor: '#10b981',
     };
+
+    // Moderator submissions require checking and approval first!
+    if (doesContentRequireApproval(userRole)) {
+      const submission: PendingTopicSubmission = {
+        id: `sub_${Date.now()}`,
+        authorUid: user?.uid || 'mod-local',
+        authorEmail: user?.email || 'moderator@webbooks.app',
+        authorName: user?.displayName || 'Moderator',
+        authorRole: userRole,
+        page: newPageObj,
+        status: 'pending',
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+      const nextQueue = [submission, ...pendingSubmissions];
+      setPendingSubmissions(nextQueue);
+      try {
+        localStorage.setItem(
+          LOCAL_PENDING_SUBMISSIONS_KEY,
+          JSON.stringify(nextQueue)
+        );
+      } catch {
+        // ignore
+      }
+      setNewPageTitle('');
+      setNewPageHtml('');
+      setUploadStatusMsg(
+        'Submitted to Content Approval Queue! Main Admin or a Secondary Admin will check and approve it before publishing.'
+      );
+      showShortcutToast('Submitted for Admin Review');
+      return;
+    }
 
     const updatedLocal = [...customPages, newPageObj];
     setCustomPages(updatedLocal);
@@ -1129,11 +1752,131 @@ export default function App() {
     setViewMode('reader');
   };
 
-  // Admin Only: Add selective admin email
-  const handleAddSelectiveAdminEmail = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isAdminUser) return;
-    const cleanEmail = newAdminEmailInput.trim().toLowerCase();
+  // =========================================================================
+  // 4-TIER ROLE GOVERNANCE & CONTENT MODERATION HANDLERS
+  // =========================================================================
+  const handleSubmitRoleRequest = (req: {
+    applicantName: string;
+    applicantEmail: string;
+    requestedRole: 'moderator' | 'secondary_admin';
+    expertiseSubject: string;
+    reason: string;
+  }) => {
+    const newReq: RolePermissionRequest = {
+      id: `req_${Date.now()}`,
+      applicantUid: user?.uid || 'guest-applicant',
+      applicantName: req.applicantName,
+      applicantEmail: req.applicantEmail.trim().toLowerCase(),
+      requestedRole: req.requestedRole,
+      expertiseSubject: req.expertiseSubject,
+      reason: req.reason,
+      status: 'pending',
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+    const next = [newReq, ...roleRequests];
+    setRoleRequests(next);
+    try {
+      localStorage.setItem(LOCAL_ROLE_REQUESTS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    showShortcutToast('Permission Request Submitted');
+  };
+
+  const handleApproveRoleRequest = (requestId: string) => {
+    const target = roleRequests.find((r) => r.id === requestId);
+    if (!target) return;
+
+    // Strictly ONLY Main Admin can approve Secondary Admin requests
+    if (target.requestedRole === 'secondary_admin') {
+      if (!canManageSecondaryAdmins(userRole, user?.email)) {
+        showShortcutToast('Only Main Admin can approve Secondary Admins');
+        return;
+      }
+      handleAddSecondaryAdminEmail(target.applicantEmail);
+    } else {
+      // Main Admin or Secondary Admin can approve Moderator requests
+      if (!canApproveModeratorRequests(userRole)) {
+        showShortcutToast('Admin permission required to approve Moderators');
+        return;
+      }
+      handleAddModeratorEmail(target.applicantEmail);
+    }
+
+    const next = roleRequests.map((r) =>
+      r.id === requestId
+        ? {
+            ...r,
+            status: 'approved' as const,
+            reviewedBy: user?.email || PRIMARY_ADMIN_EMAIL,
+          }
+        : r
+    );
+    setRoleRequests(next);
+    try {
+      localStorage.setItem(LOCAL_ROLE_REQUESTS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    const roleLabel =
+      target.requestedRole === 'secondary_admin'
+        ? 'Secondary Admin'
+        : 'Approved Moderator';
+    pushNotificationItem({
+      id: `notif-role-approved-${target.id}`,
+      category: 'role_approval',
+      title: `Approved: ${roleLabel} Permission`,
+      message: `${target.applicantName} (${target.applicantEmail}) has been approved as ${roleLabel} for ${target.expertiseSubject}.`,
+      approvalSummary: `Approved for ${roleLabel} (${target.expertiseSubject})! ${
+        target.requestedRole === 'secondary_admin'
+          ? 'Can now publish chapters, approve Moderator requests, and review Moderator content.'
+          : 'Can now build and submit new topic notes for Admin review and publication.'
+      }`,
+      targetAction: 'show_approval_detail',
+      targetSection: 'admin',
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
+    showShortcutToast(`Approved ${target.applicantName}`);
+  };
+
+  const handleRejectRoleRequest = (requestId: string) => {
+    const target = roleRequests.find((r) => r.id === requestId);
+    if (!target) return;
+    if (
+      target.requestedRole === 'secondary_admin' &&
+      !canManageSecondaryAdmins(userRole, user?.email)
+    ) {
+      return;
+    }
+    if (
+      target.requestedRole === 'moderator' &&
+      !canApproveModeratorRequests(userRole)
+    ) {
+      return;
+    }
+    const next = roleRequests.map((r) =>
+      r.id === requestId
+        ? {
+            ...r,
+            status: 'rejected' as const,
+            reviewedBy: user?.email || PRIMARY_ADMIN_EMAIL,
+          }
+        : r
+    );
+    setRoleRequests(next);
+    try {
+      localStorage.setItem(LOCAL_ROLE_REQUESTS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    showShortcutToast(`Declined request from ${target.applicantName}`);
+  };
+
+  // Strictly ONLY Main Admin (fha16554@gmail.com) can add or remove Secondary Admins
+  const handleAddSecondaryAdminEmail = (rawEmail: string) => {
+    if (!canManageSecondaryAdmins(userRole, user?.email)) return;
+    const cleanEmail = rawEmail.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) return;
     if (!selectiveAdminEmails.includes(cleanEmail)) {
       const next = [...selectiveAdminEmails, cleanEmail];
@@ -1141,15 +1884,15 @@ export default function App() {
       try {
         localStorage.setItem(LOCAL_ADMIN_EMAILS_KEY, JSON.stringify(next));
       } catch {
-        // ignore storage error
+        // ignore
       }
+      showShortcutToast(`Added Secondary Admin: ${cleanEmail}`);
     }
-    setNewAdminEmailInput('');
   };
 
-  const handleRemoveSelectiveAdminEmail = (emailToRemove: string) => {
-    if (emailToRemove.toLowerCase() === PRIMARY_ADMIN_EMAIL.toLowerCase())
-      return;
+  const handleRemoveSecondaryAdminEmail = (emailToRemove: string) => {
+    if (!canManageSecondaryAdmins(userRole, user?.email)) return;
+    if (!canModifyMainAdmin(emailToRemove)) return; // Never remove Main Admin!
     const next = selectiveAdminEmails.filter(
       (e) => e.toLowerCase() !== emailToRemove.toLowerCase()
     );
@@ -1157,8 +1900,118 @@ export default function App() {
     try {
       localStorage.setItem(LOCAL_ADMIN_EMAILS_KEY, JSON.stringify(next));
     } catch {
-      // ignore storage error
+      // ignore
     }
+    showShortcutToast(`Removed Secondary Admin: ${emailToRemove}`);
+  };
+
+  // Both Main Admin and Secondary Admin can add or remove Moderators
+  const handleAddModeratorEmail = (rawEmail: string) => {
+    if (!canApproveModeratorRequests(userRole)) return;
+    const cleanEmail = rawEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) return;
+    if (!moderatorEmails.includes(cleanEmail)) {
+      const next = [...moderatorEmails, cleanEmail];
+      setModeratorEmails(next);
+      try {
+        localStorage.setItem(LOCAL_MODERATOR_EMAILS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      showShortcutToast(`Added Moderator: ${cleanEmail}`);
+    }
+  };
+
+  const handleRemoveModeratorEmail = (emailToRemove: string) => {
+    if (!canApproveModeratorRequests(userRole)) return;
+    if (!canModifyMainAdmin(emailToRemove)) return;
+    const next = moderatorEmails.filter(
+      (e) => e.toLowerCase() !== emailToRemove.toLowerCase()
+    );
+    setModeratorEmails(next);
+    try {
+      localStorage.setItem(LOCAL_MODERATOR_EMAILS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    showShortcutToast(`Removed Moderator: ${emailToRemove}`);
+  };
+
+  // Both Main Admin and Secondary Admin can check & approve Moderator content submissions
+  const handleApprovePendingSubmission = (submissionId: string) => {
+    if (!canApproveModeratorContent(userRole)) return;
+    const target = pendingSubmissions.find((s) => s.id === submissionId);
+    if (!target || target.status !== 'pending') return;
+
+    const approvedPage: LibraryTopicPage = {
+      ...target.page,
+      updatedDate: 'Approved & Published',
+    };
+    const updatedLocal = [...customPages, approvedPage];
+    setCustomPages(updatedLocal);
+    try {
+      localStorage.setItem(
+        LOCAL_CUSTOM_TOPICS_KEY,
+        JSON.stringify(updatedLocal)
+      );
+    } catch {
+      // ignore
+    }
+
+    const nextQueue = pendingSubmissions.map((s) =>
+      s.id === submissionId
+        ? {
+            ...s,
+            status: 'approved' as const,
+            reviewedBy: user?.email || PRIMARY_ADMIN_EMAIL,
+          }
+        : s
+    );
+    setPendingSubmissions(nextQueue);
+    try {
+      localStorage.setItem(
+        LOCAL_PENDING_SUBMISSIONS_KEY,
+        JSON.stringify(nextQueue)
+      );
+    } catch {
+      // ignore
+    }
+    pushNotificationItem({
+      id: `notif-content-approved-${target.id}`,
+      category: 'content_approval',
+      title: `Approved: "${approvedPage.title}" Published`,
+      message: `Topic submission by ${target.authorName} for ${approvedPage.subject} (${approvedPage.className}) was approved and published.`,
+      approvalSummary: `Your topic "${approvedPage.title}" in ${approvedPage.className} · ${approvedPage.subject} (${approvedPage.paper}) · ${approvedPage.chapter} has been checked and approved for live reading!`,
+      targetAction: 'show_approval_detail',
+      targetSection: 'admin',
+      targetTopicId: approvedPage.id,
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
+    showShortcutToast(`Approved & Published: ${approvedPage.title}`);
+  };
+
+  const handleRejectPendingSubmission = (submissionId: string) => {
+    if (!canApproveModeratorContent(userRole)) return;
+    const nextQueue = pendingSubmissions.map((s) =>
+      s.id === submissionId
+        ? {
+            ...s,
+            status: 'rejected' as const,
+            reviewedBy: user?.email || PRIMARY_ADMIN_EMAIL,
+          }
+        : s
+    );
+    setPendingSubmissions(nextQueue);
+    try {
+      localStorage.setItem(
+        LOCAL_PENDING_SUBMISSIONS_KEY,
+        JSON.stringify(nextQueue)
+      );
+    } catch {
+      // ignore
+    }
+    showShortcutToast('Submission Rejected');
   };
 
   const toggleFolderExpand = (folderId: string) => {
@@ -1244,6 +2097,259 @@ export default function App() {
     autoCloseSidebarOnMobile();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Global Keyboard Navigation Shortcuts (e.g., 's' for Search, 't' for Theme, 'h' for Home, '[' / ']' for Font Size, '?' for Shortcuts Guide)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+
+      // Escape key behavior (always works to defocus inputs or close modals / panels)
+      if (e.key === 'Escape') {
+        if (isTyping) {
+          (target as HTMLElement).blur();
+          return;
+        }
+        if (shortcutsModalOpen) {
+          setShortcutsModalOpen(false);
+          return;
+        }
+        if (settingsOpen) {
+          setSettingsOpen(false);
+          return;
+        }
+        if (uploadModalOpen) {
+          setUploadModalOpen(false);
+          return;
+        }
+        if (rawCodeModalOpen) {
+          setRawCodeModalOpen(false);
+          return;
+        }
+        if (searchOpen) {
+          setSearchOpen(false);
+          return;
+        }
+        if (quickTopicOpen) {
+          setQuickTopicOpen(false);
+          return;
+        }
+        if (viewMode === 'reader') {
+          setViewMode('home');
+          return;
+        }
+        if (viewMode === 'home' && homeStage === 'topics') {
+          goToChaptersStage(selectedClass, selectedSubject, selectedPaper);
+          return;
+        }
+        if (viewMode === 'home' && homeStage === 'chapters') {
+          goToSubjectsStage(selectedClass);
+          return;
+        }
+        return;
+      }
+
+      // Do not trigger navigation shortcuts when user is typing in form fields
+      if (isTyping) return;
+
+      // Focus Search Bar: 's', '/', or 'Ctrl+K' / 'Cmd+K'
+      if (
+        (e.key === 's' || e.key === 'S' || e.key === '/') &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
+        setSearchOpen(true);
+        setQuickTopicOpen(false);
+        window.setTimeout(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        }, 50);
+        showShortcutToast('Search (s / /)');
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setSearchOpen(true);
+        setQuickTopicOpen(false);
+        window.setTimeout(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        }, 50);
+        return;
+      }
+
+      // Toggle Theme: 't' or 'T' (Cycles OLED Dark -> Dark -> Warm -> Light and locks preference)
+      if (
+        (e.key === 't' || e.key === 'T') &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
+        setIsThemeAutoDetect(false);
+        setTheme((prev) => {
+          const next = cycleAppThemeMode(prev);
+          try {
+            localStorage.setItem(LOCAL_THEME_USER_LOCKED_KEY, 'true');
+            localStorage.setItem(LOCAL_THEME_KEY, next);
+          } catch {
+            // ignore
+          }
+          const label =
+            next === 'oled'
+              ? 'OLED Dark (#000)'
+              : next === 'dark'
+              ? 'Soft Dark Mode'
+              : next === 'yellow'
+              ? 'Warm Reading Mode'
+              : 'Clean Light Mode';
+          showShortcutToast(`${label} (t)`);
+          return next;
+        });
+        return;
+      }
+
+      // Return to Home (All Subjects): 'h' or 'H'
+      if (
+        (e.key === 'h' || e.key === 'H') &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
+        goToSubjectsStage(selectedClass || 'ALL');
+        showShortcutToast('Home (h)');
+        return;
+      }
+
+      // Decrease Font Scale: '['
+      if (e.key === '[' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setFontScale((prev) => {
+          const next = Math.max(14, prev - 1);
+          showShortcutToast(`Font: ${next}px ([)`);
+          return next;
+        });
+        return;
+      }
+
+      // Increase Font Scale: ']'
+      if (e.key === ']' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setFontScale((prev) => {
+          const next = Math.min(26, prev + 1);
+          showShortcutToast(`Font: ${next}px (])`);
+          return next;
+        });
+        return;
+      }
+
+      // Toggle Curvature Profile: 'c' or 'C'
+      if (
+        (e.key === 'c' || e.key === 'C') &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
+        setCurveProfile((prev) => {
+          const next = prev === 'g2' ? 'classic' : 'g2';
+          const label =
+            next === 'g2'
+              ? 'G2 Continuous Curve (Squircle)'
+              : 'Classic G1 Curve (Circular Arc)';
+          showShortcutToast(`${label} (c)`);
+          return next;
+        });
+        return;
+      }
+
+      // Toggle Keyboard Shortcuts Modal: '?'
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setShortcutsModalOpen((prev) => !prev);
+        return;
+      }
+    };
+
+    // Android Capacitor & WebView hardware/gesture back button support
+    const handleAndroidBackButton = (e: Event) => {
+      if (e.defaultPrevented) return;
+      if (shortcutsModalOpen) {
+        e.preventDefault();
+        setShortcutsModalOpen(false);
+        return;
+      }
+      if (settingsOpen) {
+        e.preventDefault();
+        setSettingsOpen(false);
+        return;
+      }
+      if (uploadModalOpen) {
+        e.preventDefault();
+        setUploadModalOpen(false);
+        return;
+      }
+      if (rawCodeModalOpen) {
+        e.preventDefault();
+        setRawCodeModalOpen(false);
+        return;
+      }
+      if (searchOpen) {
+        e.preventDefault();
+        setSearchOpen(false);
+        return;
+      }
+      if (quickTopicOpen) {
+        e.preventDefault();
+        setQuickTopicOpen(false);
+        return;
+      }
+      if (viewMode === 'reader') {
+        e.preventDefault();
+        setViewMode('home');
+        return;
+      }
+      if (viewMode === 'home' && homeStage === 'topics') {
+        e.preventDefault();
+        goToChaptersStage(selectedClass, selectedSubject, selectedPaper);
+        return;
+      }
+      if (viewMode === 'home' && homeStage === 'chapters') {
+        e.preventDefault();
+        goToSubjectsStage(selectedClass);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('backbutton', handleAndroidBackButton);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('backbutton', handleAndroidBackButton);
+    };
+  }, [
+    shortcutsModalOpen,
+    settingsOpen,
+    uploadModalOpen,
+    rawCodeModalOpen,
+    searchOpen,
+    quickTopicOpen,
+    viewMode,
+    homeStage,
+    selectedSubject,
+    selectedPaper,
+    selectedClass,
+    curveProfile,
+  ]);
 
   // Recursive Folder Tree renderer in Sidebar (all classes 1 to 12)
   const renderFolderTree = (
@@ -1508,32 +2614,40 @@ export default function App() {
         className={`wb-sidebar ${sidebarOpen ? 'is-open' : 'is-closed'}`}
       >
         <div className="wb-sidebar-inner">
-          {/* Top Row of Sidebar: "Web Books / by Afeed" + Settings Gear at top-right */}
+          {/* Top Row of Sidebar: Web Books Globe Logo + "Web Books / by Afeed" + Settings Gear at top-right */}
           <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between shrink-0 border-b border-[var(--border)]/50">
-            <div className="flex flex-col leading-tight select-none">
-              <span
-                data-testid="brand-title"
-                className="text-sm font-bold tracking-tight text-[var(--text-main)]"
-              >
-                Web Books
-              </span>
-              <span
-                data-testid="brand-subtitle"
-                className="text-[11px] font-medium text-[var(--text-muted)] opacity-55"
-              >
-                by Afeed
-              </span>
+            <div className="flex items-center gap-2.5 select-none min-w-0">
+              <WebBooksLogo
+                variant="framed"
+                className="w-7 h-7 rounded-xl shrink-0 shadow-xs"
+                dataTestId="sidebar-globe-logo"
+              />
+              <div className="flex flex-col leading-tight min-w-0">
+                <span
+                  data-testid="brand-title"
+                  className="text-sm font-bold tracking-tight text-[var(--text-main)] truncate"
+                >
+                  Web Books
+                </span>
+                <span
+                  data-testid="brand-subtitle"
+                  className="text-[11px] font-medium text-[var(--text-muted)] opacity-55 truncate"
+                >
+                  by Afeed
+                </span>
+              </div>
             </div>
           <button
             type="button"
             onClick={() => {
-              setSettingsTab('display');
+              setSettingsSection('theme');
               setSettingsOpen(true);
+              autoCloseSidebarOnMobile();
             }}
-            aria-label="Open Settings Menu"
+            aria-label="Open Settings App"
             data-testid="sidebar-settings-btn"
             className="p-2 rounded-xl hover:bg-[var(--surface-subtle)] opacity-75 hover:opacity-100 transition-all duration-200"
-            title="Settings (Display Mode, Google Login, Student Profile & Feedback)"
+            title="Settings (Profile, Appearance & Theme, Visual & Animation, App Version, FAQ & Moderation)"
           >
             <svg
               viewBox="0 0 24 24"
@@ -1655,14 +2769,16 @@ export default function App() {
           </div>
         </div>
 
-        {/* Bottom Sidebar Footer: Account Status + Admin Workspace button (ONLY if Admin) */}
+        {/* Bottom Sidebar Footer: Account Status + Content/Admin Workspace button */}
         <div className="p-3 border-t border-[var(--border)] space-y-2 shrink-0">
           <button
             type="button"
             onClick={() => {
-              setSettingsTab('account');
+              setSettingsSection('account');
               setSettingsOpen(true);
+              autoCloseSidebarOnMobile();
             }}
+            data-testid="sidebar-profile-btn"
             className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--surface-subtle)] hover:opacity-90 transition-opacity text-left text-xs"
           >
             <div className="min-w-0">
@@ -1678,28 +2794,33 @@ export default function App() {
               </div>
             </div>
             <span className="text-[11px] font-medium text-[var(--accent)] shrink-0 ml-2">
-              Edit
+              Settings
             </span>
           </button>
 
-          {/* Selective Admin Editor Button — strictly hidden for regular users */}
-          {isAdminUser && (
+          {/* Content Creation Button — visible for Main Admin, Secondary Admin, and Moderator */}
+          {canSubmitTopicContent(userRole) && (
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
+                data-testid="sidebar-new-topic-btn"
                 onClick={() => setUploadModalOpen(true)}
                 className="flex-1 py-2 px-2.5 rounded-lg btn-accent text-xs text-center whitespace-nowrap"
               >
-                + New Topic Page
+                {userRole === 'moderator'
+                  ? '+ Submit Topic (Review)'
+                  : '+ New Topic Page'}
               </button>
-              <button
-                type="button"
-                onClick={() => setRawCodeModalOpen(true)}
-                className="py-2 px-2.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-subtle)] text-xs font-semibold whitespace-nowrap"
-                title="Export Raw HTML & Navigation Code"
-              >
-                HTML
-              </button>
+              {isAdminUser && (
+                <button
+                  type="button"
+                  onClick={() => setRawCodeModalOpen(true)}
+                  className="py-2 px-2.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface-subtle)] text-xs font-semibold whitespace-nowrap"
+                  title="Export Raw HTML & Navigation Code"
+                >
+                  HTML
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1715,7 +2836,8 @@ export default function App() {
             Left: Sidebar Toggle + Back button (in Chapters, Expanded Chapter Topics, or Reader) + Clean Title
             Right Corner:
               - Quick Topic Content Button (ONLY in Reader mode — never outside of content!)
-              - Search Button (with Filters) */}
+              - Search Button (with Filters)
+              (Keyboard Shortcuts button moved exclusively inside Settings per user request) */}
         <header
           data-testid="wb-sticky-header"
           className={`sticky top-0 z-30 h-14 px-4 sm:px-6 bg-[var(--bg-primary)]/92 backdrop-blur-md flex items-center justify-between gap-3 transition-all duration-200 ${
@@ -1804,45 +2926,43 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Corner Zone: Viewing Area Collapse Toggle + Quick Topic Content Button (ONLY inside uploaded Reader content) + Search Button */}
+          {/* Right Corner Zone: Notifications Button (replaces Collapse Toggle per user request) + Quick Topic Content Button (ONLY inside Reader content) + Search Button */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Viewing Area Collapse / Expand Toggle Button (in Home Mode) */}
-            {viewMode === 'home' && (
-              <button
-                type="button"
-                onClick={() => setManualViewingCollapsed((prev) => !prev)}
-                aria-label={
-                  viewingCollapse.isCollapsed
-                    ? 'Expand Viewing Area'
-                    : 'Collapse Viewing Area'
-                }
-                data-testid="toggle-viewing-area-btn"
-                className={`p-2 rounded-xl border transition-all duration-200 ${
-                  manualViewingCollapsed
-                    ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent hover:bg-[var(--surface-subtle)]'
-                }`}
-                title={
-                  viewingCollapse.isCollapsed
-                    ? 'Expand Viewing Area'
-                    : 'Collapse Viewing Area'
-                }
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    viewingCollapse.isCollapsed ? 'rotate-180' : ''
-                  }`}
+            {/* Notifications Button (Opens Floating Popover UI -> Expandable to Full Notification Center) */}
+            <button
+              type="button"
+              onClick={() => {
+                setNotificationsPopoverOpen((prev) => !prev);
+                setQuickTopicOpen(false);
+                setSearchOpen(false);
+              }}
+              aria-label={`Notifications${
+                unreadNotificationsCount > 0
+                  ? ` (${unreadNotificationsCount} unread)`
+                  : ''
+              }`}
+              data-testid="header-notifications-btn"
+              className={`relative p-2 rounded-xl border transition-all duration-200 ${
+                notificationsPopoverOpen || notificationsExpandedOpen
+                  ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)]'
+                  : 'border-transparent hover:bg-[var(--surface-subtle)]'
+              }`}
+              title="Notifications (Version Updates & Approvals)"
+            >
+              {unreadNotificationsCount > 0 ? (
+                <BellRing className="w-5 h-5" />
+              ) : (
+                <Bell className="w-5 h-5" />
+              )}
+              {unreadNotificationsCount > 0 && (
+                <span
+                  data-testid="header-notifications-badge"
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--accent)] text-[var(--accent-contrast)] text-[10px] font-bold flex items-center justify-center tabular-nums"
                 >
-                  <polyline points="18 15 12 9 6 15" />
-                </svg>
-              </button>
-            )}
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
 
             {viewMode === 'reader' && !activeSemiChapter && (
               <button
@@ -1850,6 +2970,7 @@ export default function App() {
                 onClick={() => {
                   setQuickTopicOpen((prev) => !prev);
                   setSearchOpen(false);
+                  setNotificationsPopoverOpen(false);
                 }}
                 aria-label="Quick Topic Contents"
                 data-testid="quick-topic-btn"
@@ -1870,15 +2991,16 @@ export default function App() {
               onClick={() => {
                 setSearchOpen((prev) => !prev);
                 setQuickTopicOpen(false);
+                setNotificationsPopoverOpen(false);
               }}
-              aria-label="Search and Filter Notes"
+              aria-label="Search and Filter Notes (s or /)"
               data-testid="header-search-btn"
               className={`p-2 rounded-xl border transition-all duration-200 ${
                 searchOpen
                   ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent)]'
                   : 'border-transparent hover:bg-[var(--surface-subtle)]'
               }`}
-              title="Search & Filter"
+              title="Search & Filter (Press 's' or '/')"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1895,6 +3017,53 @@ export default function App() {
             </button>
           </div>
         </header>
+
+        {/* =====================================================================
+            NOTIFICATIONS FLOATING POPOVER + EXPANDED MODAL + APPROVAL DIALOG
+           ===================================================================== */}
+        <NotificationsCenter
+          notifications={notifications}
+          unreadCount={unreadNotificationsCount}
+          popoverOpen={notificationsPopoverOpen}
+          expandedOpen={notificationsExpandedOpen}
+          setPopoverOpen={setNotificationsPopoverOpen}
+          setExpandedOpen={setNotificationsExpandedOpen}
+          onMarkAsRead={(id) =>
+            setNotifications((prev) =>
+              prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+            )
+          }
+          onMarkAllAsRead={() =>
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+          }
+          onClearNotification={(id) =>
+            setNotifications((prev) => prev.filter((n) => n.id !== id))
+          }
+          onSelectNotification={handleSelectNotification}
+          activeApprovalDetail={activeApprovalDetail}
+          onCloseApprovalDetail={() => setActiveApprovalDetail(null)}
+          onNavigateFromApproval={() => {
+            if (!activeApprovalDetail) return;
+            const topicId = activeApprovalDetail.targetTopicId;
+            const sec = activeApprovalDetail.targetSection || 'admin';
+            setActiveApprovalDetail(null);
+            if (topicId) {
+              const targetPage = allPages.find((p) => p.id === topicId);
+              if (targetPage) {
+                setActivePageId(targetPage.id);
+                setActiveSemiChapter(null);
+                setViewMode('reader');
+                setSettingsOpen(false);
+                return;
+              }
+            }
+            setSettingsSection(sec as SettingsSectionId);
+            setSettingsOpen(true);
+          }}
+          appVariant={appVariant}
+          pushPermission={pushPermission}
+          onRequestPushPermission={handleRequestPushPermission}
+        />
 
         {/* =====================================================================
             QUICK TOPIC POPOVER (Rendered ONLY inside Reader Content Mode)
@@ -1959,13 +3128,14 @@ export default function App() {
             <div className="w-full space-y-3">
               <div className="flex items-center gap-2">
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     if (viewMode !== 'home') setViewMode('home');
                   }}
-                  placeholder="Search topic, reaction, or chapter (e.g., Alkene, Ozonolysis, Markovnikov)..."
+                  placeholder="Search topic, reaction, or chapter (e.g., Alkene, Ozonolysis)... [Press 's' or '/']"
                   className="flex-1 px-4 py-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs focus:outline-none focus:border-[var(--accent)]"
                 />
                 <button
@@ -2191,6 +3361,16 @@ export default function App() {
                         )}px) scale(${viewingCollapse.viewingAreaScale})`,
                       }}
                     >
+                      {/* Homepage Brand Logo Crest */}
+                      <div className="flex justify-center mb-3">
+                        <WebBooksLogo
+                          variant="framed"
+                          className="w-16 h-16 sm:w-20 sm:h-20 drop-shadow-md rounded-[22px] transition-transform duration-300 hover:scale-105"
+                          dataTestId="homepage-hero-logo"
+                          animated
+                        />
+                      </div>
+
                       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
                         Web Books
                       </h2>
@@ -3223,787 +4403,232 @@ export default function App() {
       </div>
 
       {/* =====================================================================
-          SETTINGS MENU MODAL (Display Mode, Google Login & Profile, Feedback, Admin)
-          100% English System Language + 26px Squircle Modal Radius
+          FLOATING SHORTCUT TOAST NOTIFICATION
          ===================================================================== */}
-      {settingsOpen && (
+      {shortcutToast && (
         <div
-          data-testid="settings-modal"
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 view-transition-enter"
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 pointer-events-none px-4 py-2 rounded-2xl bg-[var(--surface-card)] text-[var(--text-main)] border border-[var(--border)] shadow-xl text-xs font-semibold backdrop-blur-md transition-all animate-bounce"
         >
-          <div className="w-full max-w-lg rounded-[26px] border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold">Settings</h2>
-                <p className="text-[11px] opacity-55">Web Books by Afeed</p>
+          {shortcutToast}
+        </div>
+      )}
+
+      {/* =====================================================================
+          KEYBOARD SHORTCUTS MODAL (Desktop, Laptop & External Display Guide)
+         ===================================================================== */}
+      {shortcutsModalOpen && (
+        <div
+          data-testid="shortcuts-modal"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 view-transition-enter"
+          onClick={() => setShortcutsModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-[26px] border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--surface-subtle)]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] flex items-center justify-center font-bold text-sm">
+                  ⌨️
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Keyboard Shortcuts</h3>
+                  <p className="text-[11px] opacity-60">
+                    Fast navigation for Desktop, Laptop &amp; External Displays
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setSettingsOpen(false)}
-                aria-label="Close Settings"
-                className="p-1.5 rounded-lg hover:bg-[var(--surface-subtle)] opacity-75 hover:opacity-100"
+                onClick={() => setShortcutsModalOpen(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[var(--surface-card)] text-base"
+                title="Close Shortcuts Modal"
               >
-                <CloseIcon className="w-4 h-4" />
+                ✕
               </button>
             </div>
 
-            {/* Settings Navigation Tabs */}
-            <div className="px-5 pt-3 border-b border-[var(--border)] flex items-center gap-2 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setSettingsTab('display')}
-                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                  settingsTab === 'display'
-                    ? 'border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent opacity-70 hover:opacity-100'
-                }`}
-              >
-                Display Mode
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsTab('account')}
-                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                  settingsTab === 'account'
-                    ? 'border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent opacity-70 hover:opacity-100'
-                }`}
-              >
-                Account &amp; Student Profile
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsTab('feedback')}
-                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                  settingsTab === 'feedback'
-                    ? 'border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent opacity-70 hover:opacity-100'
-                }`}
-              >
-                Feedback
-              </button>
-              {isAdminUser && (
-                <button
-                  type="button"
-                  onClick={() => setSettingsTab('admin')}
-                  className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                    settingsTab === 'admin'
-                      ? 'border-[var(--accent)] text-[var(--accent)]'
-                      : 'border-transparent opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  Admin Panel
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setSettingsTab('manual')}
-                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                  settingsTab === 'manual'
-                    ? 'border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent opacity-70 hover:opacity-100'
-                }`}
-              >
-                Manual &amp; License
-              </button>
+            <div className="p-6 space-y-3.5 text-xs">
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--border)]">
+                <span className="opacity-80">Focus Search Bar</span>
+                <div className="flex items-center gap-1">
+                  <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">s</kbd>
+                  <span className="opacity-40">or</span>
+                  <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">/</kbd>
+                  <span className="opacity-40">or</span>
+                  <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">Ctrl+K</kbd>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--border)]">
+                <span className="opacity-80">Cycle Theme (OLED Dark / Dark / Warm / Light)</span>
+                <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">t</kbd>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--border)]">
+                <span className="opacity-80">Toggle Curve Profile (G2 Squircle / Classic G1)</span>
+                <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">c</kbd>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--border)]">
+                <span className="opacity-80">Return to Home (All Subjects)</span>
+                <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">h</kbd>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--border)]">
+                <span className="opacity-80">Decrease / Increase Font Size</span>
+                <div className="flex items-center gap-1">
+                  <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">[</kbd>
+                  <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">]</kbd>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5 border-b border-[var(--border)]">
+                <span className="opacity-80">Close Modals / Panels / Back</span>
+                <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">Esc</kbd>
+              </div>
+
+              <div className="flex items-center justify-between py-1.5">
+                <span className="opacity-80">Open this Shortcuts Guide</span>
+                <kbd className="px-2 py-1 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] font-mono text-[11px]">?</kbd>
+              </div>
             </div>
 
-            {/* Modal Content Body */}
-            <div className="p-5 overflow-y-auto space-y-5 text-xs">
-              {/* TAB 1: DISPLAY MODE (Pitch-Black OLED, Reading Sepia, Light + Font Size) */}
-              {settingsTab === 'display' && (
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="block font-semibold opacity-80">
-                      Color Theme (Automatically remembered)
-                    </label>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setTheme('dark')}
-                        className={`py-3 px-3 rounded-2xl border text-center font-semibold transition-all ${
-                          theme === 'dark'
-                            ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                            : 'border-[var(--border)] bg-[var(--surface-subtle)] opacity-80'
-                        }`}
-                      >
-                        OLED Dark (#000)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTheme('yellow')}
-                        className={`py-3 px-3 rounded-2xl border text-center font-semibold transition-all ${
-                          theme === 'yellow'
-                            ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                            : 'border-[var(--border)] bg-[var(--surface-subtle)] opacity-80'
-                        }`}
-                      >
-                        Reading Sepia
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTheme('light')}
-                        className={`py-3 px-3 rounded-2xl border text-center font-semibold transition-all ${
-                          theme === 'light'
-                            ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                            : 'border-[var(--border)] bg-[var(--surface-subtle)] opacity-80'
-                        }`}
-                      >
-                        Clean Light
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Font Scale */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold opacity-80">
-                        Reader Font Size
-                      </span>
-                      <span className="font-mono">{fontScale}px</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFontScale((s) => Math.max(14, s - 1))
-                        }
-                        className="flex-1 py-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] font-bold"
-                      >
-                        A- (Smaller)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFontScale(18)}
-                        className="px-4 py-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)]"
-                      >
-                        Reset
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFontScale((s) => Math.min(24, s + 1))
-                        }
-                        className="flex-1 py-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] font-bold"
-                      >
-                        A+ (Larger)
-                      </button>
-                    </div>
-                  </div>
-
-                   {/* See / Hide All Dropdowns in Reader (English only) */}
-                  <div className="space-y-2">
-                    <span className="block font-semibold opacity-80">
-                      Interactive Mechanism &amp; Note Dropdowns
-                    </span>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAllDropdowns(true)}
-                        className="py-2.5 px-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] font-semibold hover:border-[var(--accent)]"
-                      >
-                        See All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAllDropdowns(false)}
-                        className="py-2.5 px-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] font-semibold hover:border-[var(--accent)]"
-                      >
-                        Hide All
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Adaptive Screen Form Factor & Viewing Area Control */}
-                  <div className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-[var(--accent)]">
-                        Adaptive Screen Profile
-                      </span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold badge-success">
-                        {deviceProfile.label}
-                      </span>
-                    </div>
-                    <p className="text-[11px] opacity-80 leading-relaxed">
-                      Viewport: <span className="font-mono">{viewportSize.width}×{viewportSize.height}px</span> · Recommended Grid: <span className="font-mono">{deviceProfile.recommendedColumns} col(s)</span>. Automatically adapts layout margins and focus blocks for Phones, Passport Square Foldables, Book Foldables, DeX, and Desktop PCs.
-                    </p>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[11px] font-medium">
-                        Top Viewing Area
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setManualViewingCollapsed((prev) => !prev)
-                        }
-                        className="px-3 py-1 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-[11px] font-semibold hover:border-[var(--accent)]"
-                      >
-                        {manualViewingCollapsed
-                          ? 'Expand Viewing Area'
-                          : 'Collapse Viewing Area'}
-                      </button>
-                    </div>
-
-                    {/* Low-End Device Efficiency Mode (60fps Lite) */}
-                    <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-medium">
-                          Low-End Device Efficiency (60fps Lite)
-                        </span>
-                        <span className="text-[10px] font-semibold text-[var(--accent)]">
-                          {isLowEndEfficiencyActive ? 'Active' : 'Standard GPU'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {(['auto', 'enabled', 'disabled'] as const).map(
-                          (mode) => (
-                            <button
-                              key={mode}
-                              type="button"
-                              data-testid={`efficiency-mode-${mode}`}
-                              onClick={() => setEfficiencyMode(mode)}
-                              className={`py-1.5 px-2 rounded-xl border text-[11px] font-semibold capitalize transition-all ${
-                                efficiencyMode === mode
-                                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
-                                  : 'border-[var(--border)] bg-[var(--bg-card)] opacity-80 hover:opacity-100'
-                              }`}
-                            >
-                              {mode === 'auto'
-                                ? 'Auto Detect'
-                                : mode === 'enabled'
-                                ? 'Always On'
-                                : 'Standard'}
-                            </button>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: GOOGLE ACCOUNT & STUDENT PROFILE (Optional Class, School, Phone) */}
-              {settingsTab === 'account' && (
-                <div className="space-y-5">
-                  {/* Google Account Login Card */}
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-3">
-                    <div className="font-semibold">Google Account</div>
-                    {!user ? (
-                      <div className="space-y-2">
-                        <p className="opacity-75 leading-relaxed">
-                          Sign in with your Google Account to sync your profile
-                          to Cloud Firestore, submit feedback, or access
-                          selective Admin tools.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleGoogleLogin}
-                          className="w-full py-2.5 px-4 rounded-2xl btn-accent"
-                        >
-                          Continue with Google
-                        </button>
-                        {authErrorDetails && (
-                          <div className="p-3 rounded-xl alert-danger text-[11px] space-y-2">
-                            <div className="font-semibold flex items-center justify-between">
-                              <span>Authentication Issue:</span>
-                              <span className="font-mono text-[10px] opacity-80">
-                                {authErrorDetails.code}
-                              </span>
-                            </div>
-                            <p className="text-[var(--text-main)] opacity-90 leading-relaxed">
-                              {authErrorDetails.actionableTip ||
-                                authErrorDetails.message}
-                            </p>
-                            {authErrorDetails.code === 'unauthorized-domain' && (
-                              <div className="pt-2 flex flex-col gap-2">
-                                <div className="flex flex-wrap gap-2 items-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(
-                                        window.location.hostname || 'localhost'
-                                      );
-                                      setDomainCopied(true);
-                                      window.setTimeout(
-                                        () => setDomainCopied(false),
-                                        3000
-                                      );
-                                    }}
-                                    className="px-2.5 py-1 rounded-lg bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border)] font-semibold hover:border-[var(--accent)]"
-                                  >
-                                    {domainCopied
-                                      ? `Copied: ${window.location.hostname || 'localhost'}`
-                                      : `Copy Domain: ${window.location.hostname || 'localhost'}`}
-                                  </button>
-                                  <a
-                                    href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/settings`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="px-2.5 py-1 rounded-lg btn-accent text-[11px] font-semibold flex items-center gap-1"
-                                  >
-                                    Open Firebase Settings ↗
-                                  </a>
-                                </div>
-                                <div className="text-[10px] opacity-80 space-y-1 leading-snug">
-                                  <p>• <strong>To enable Google Login on Android APK</strong>: Click <em>Open Firebase Settings</em> above, scroll to <strong>Authorized Domains</strong>, click <strong>Add domain</strong>, type <code>localhost</code>, and click <strong>Save</strong>.</p>
-                                  <p>• <strong>Offline Note</strong>: You can still save and use your Student Class & Profile below locally — login is optional for offline book reading!</p>
-                                </div>
-                              </div>
-                            )}
-                            {authErrorDetails.code === 'popup-blocked' && (
-                              <div className="pt-1">
-                                <a
-                                  href={window.location.href}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-block px-2.5 py-1 rounded-lg btn-accent"
-                                >
-                                  Open App in Full Browser Tab ↗
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-bold truncate">
-                            {user.displayName || 'User'}
-                          </div>
-                          <div className="opacity-70 truncate">{user.email}</div>
-                          {isAdminUser && (
-                            <div className="text-[11px] text-[var(--accent)] font-semibold mt-0.5">
-                              Role: Selective Admin
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleLogout}
-                          className="px-3 py-1.5 rounded-xl border border-[var(--border)] hover:bg-[var(--bg-card)] shrink-0"
-                        >
-                          Sign Out
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Student Profile Form: Optional Class (filters Home Page!), Optional School, Optional Phone */}
-                  <form onSubmit={handleSaveProfile} className="space-y-3.5">
-                    <div className="font-semibold">
-                      Student Profile (Optional)
-                    </div>
-                    <p className="text-[11px] opacity-70 leading-relaxed">
-                      If you select your Class below, the Home Page will
-                      automatically show only your Class subjects while all
-                      classes (1–12) remain accessible in the Sidebar.
-                    </p>
-
-                    <div>
-                      <label className="block text-[11px] opacity-75 mb-1">
-                        Class (Optional)
-                      </label>
-                      <select
-                        aria-label="Student Class"
-                        data-testid="profile-class-select"
-                        value={studentClass}
-                        onChange={(e) => setStudentClass(e.target.value)}
-                        className="w-full px-3 py-2 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                      >
-                        <option value="">All Classes (No Filter)</option>
-                        {ALL_CLASS_LEVELS.map((cls) => (
-                          <option key={cls} value={cls}>
-                            {cls}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] opacity-75 mb-1">
-                        School / College Name (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={schoolName}
-                        onChange={(e) => setSchoolName(e.target.value)}
-                        placeholder="e.g., Notre Dame College / Viqarunnisa Noon School"
-                        className="w-full px-3 py-2 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] opacity-75 mb-1">
-                        Phone Number (Optional)
-                      </label>
-                      <input
-                        type="tel"
-                        value={phoneInput}
-                        onChange={(e) => setPhoneInput(e.target.value)}
-                        placeholder="+8801XXXXXXXXX"
-                        className="w-full px-3 py-2 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={profileSaving}
-                      data-testid="save-profile-btn"
-                      className="w-full py-2.5 rounded-2xl btn-accent disabled:opacity-50"
-                    >
-                      {profileSaving ? 'Saving...' : 'Save Student Profile'}
-                    </button>
-
-                    {profileStatusMsg && (
-                      <p className="text-[var(--success-text)] font-medium text-[11px]">
-                        {profileStatusMsg}
-                      </p>
-                    )}
-                  </form>
-
-                  {/* User Data Storage Destinations Overview */}
-                  <div className="p-3.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-1.5 text-[11px] opacity-80">
-                    <div className="font-semibold text-[var(--accent)]">
-                      Where Your Data Is Stored
-                    </div>
-                    <p>
-                      • <strong>Student Profile:</strong> Cloud Firestore{' '}
-                      <code className="px-1 py-0.5 rounded bg-[var(--bg-card)]">
-                        /users_private/&#123;uid&#125;
-                      </code>{' '}
-                      (isolated private document) &amp; device{' '}
-                      <code className="px-1 py-0.5 rounded bg-[var(--bg-card)]">
-                        localStorage
-                      </code>
-                      .
-                    </p>
-                    <p>
-                      • <strong>Topic Feedbacks:</strong> Cloud Firestore{' '}
-                      <code className="px-1 py-0.5 rounded bg-[var(--bg-card)]">
-                        /feedbacks/&#123;feedbackId&#125;
-                      </code>
-                      .
-                    </p>
-                    <p>
-                      • <strong>Display Theme &amp; Font Size:</strong> Device{' '}
-                      <code className="px-1 py-0.5 rounded bg-[var(--bg-card)]">
-                        localStorage
-                      </code>{' '}
-                      for instant recall.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: FEEDBACK */}
-              {settingsTab === 'feedback' && (
-                <div className="space-y-4">
-                  <form onSubmit={handleSubmitFeedback} className="space-y-3">
-                    <div className="font-semibold">
-                      Submit Feedback for: {activePage.title}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setFeedbackRating(star)}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold inline-flex items-center gap-1 transition-all ${
-                            feedbackRating >= star
-                              ? 'bg-[var(--caution-bg)] border-[var(--caution-border)] text-[var(--caution-text)]'
-                              : 'border-[var(--border)] opacity-45'
-                          }`}
-                        >
-                          <StarIcon
-                            filled={feedbackRating >= star}
-                            className="w-3.5 h-3.5"
-                          />
-                          <span>{star}</span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <textarea
-                      rows={3}
-                      value={feedbackMessage}
-                      onChange={(e) => setFeedbackMessage(e.target.value)}
-                      placeholder="Write your feedback, question, or suggestion..."
-                      className="w-full px-3 py-2 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={feedbackSubmitting}
-                      className="w-full py-2.5 rounded-2xl btn-accent disabled:opacity-50"
-                    >
-                      {feedbackSubmitting ? 'Sending...' : 'Send Feedback'}
-                    </button>
-
-                    {feedbackStatusMsg && (
-                      <p className="text-[11px] text-[var(--accent)]">
-                        {feedbackStatusMsg}
-                      </p>
-                    )}
-                  </form>
-
-                  {myFeedbacks.length > 0 && (
-                    <div className="pt-3 border-t border-[var(--border)] space-y-2">
-                      <div className="font-semibold opacity-75">
-                        Your Submitted Feedbacks ({myFeedbacks.length})
-                      </div>
-                      {myFeedbacks.map((fb) => (
-                        <div
-                          key={fb.id}
-                          className="p-3 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-1"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[var(--caution-border)] font-bold inline-flex items-center gap-0.5">
-                              {Array.from({ length: fb.rating }).map(
-                                (_, idx) => (
-                                  <StarIcon
-                                    key={idx}
-                                    filled={true}
-                                    className="w-3 h-3"
-                                  />
-                                )
-                              )}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteFeedback(fb.id)}
-                              className="text-[var(--danger-text)] font-medium hover:underline text-[11px]"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                          <p className="opacity-90">{fb.message}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 4: SELECTIVE ADMIN PANEL (Strictly visible only to authorized Admin email) */}
-              {settingsTab === 'admin' && isAdminUser && (
-                <div className="space-y-5">
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-3">
-                    <div className="font-bold text-[var(--accent)]">
-                      Admin Editor Actions
-                    </div>
-                    <p className="opacity-75">
-                      Build or upload new textbook topic pages or export raw
-                      HTML sections.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSettingsOpen(false);
-                          setUploadModalOpen(true);
-                        }}
-                        className="px-4 py-2 rounded-2xl btn-accent"
-                      >
-                        + Upload / Build New Topic Page
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSettingsOpen(false);
-                          setRawCodeModalOpen(true);
-                        }}
-                        className="px-4 py-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] font-semibold"
-                      >
-                        Export Raw HTML &amp; Links
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Selective Admin Email Allowlist Manager */}
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-3">
-                    <div className="font-bold">
-                      Selective Admin Emails Allowlist
-                    </div>
-                    <form
-                      onSubmit={handleAddSelectiveAdminEmail}
-                      className="flex gap-2"
-                    >
-                      <input
-                        type="email"
-                        value={newAdminEmailInput}
-                        onChange={(e) => setNewAdminEmailInput(e.target.value)}
-                        placeholder="Add admin email (e.g. teacher@gmail.com)"
-                        className="flex-1 px-3 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] text-xs"
-                      />
-                      <button
-                        type="submit"
-                        className="px-3.5 py-2 rounded-2xl btn-accent shrink-0"
-                      >
-                        Add
-                      </button>
-                    </form>
-                    <div className="space-y-1.5">
-                      {selectiveAdminEmails.map((email) => (
-                        <div
-                          key={email}
-                          className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]"
-                        >
-                          <span className="truncate">{email}</span>
-                          {email.toLowerCase() ===
-                          PRIMARY_ADMIN_EMAIL.toLowerCase() ? (
-                            <span className="text-[10px] opacity-60">
-                              Primary Admin
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleRemoveSelectiveAdminEmail(email)
-                              }
-                              className="text-[var(--danger-text)] font-medium hover:underline text-[11px]"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 5: INSTRUCTIONS MANUAL, MULTI-OS NATIVE APP PLAN & OPEN SOURCE LICENSE */}
-              {settingsTab === 'manual' && (
-                <div className="space-y-4 text-xs">
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-sm text-[var(--accent)]">
-                        Web Books by Afeed
-                      </span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold badge-success">
-                        MIT Open Source
-                      </span>
-                    </div>
-                    <p className="opacity-80 leading-relaxed text-[11px]">
-                      A distraction-free multi-platform digital textbook reader and chemistry notebook featuring collapsible Viewing Areas, adaptive layouts for Phones, Passport Foldables, Book Foldables, DeX &amp; Desktop PCs, and theme-safe OLED / Sepia / Light palettes.
-                    </p>
-                    {deferredInstallPrompt && !isInstalledPWA && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await deferredInstallPrompt.prompt();
-                          const choice = await deferredInstallPrompt.userChoice;
-                          if (choice.outcome === 'accepted') {
-                            setIsInstalledPWA(true);
-                          }
-                          setDeferredInstallPrompt(null);
-                        }}
-                        className="w-full py-2 px-3 rounded-xl btn-accent text-xs"
-                      >
-                        Install Web Books App on This Device
-                      </button>
-                    )}
-                  </div>
-
-                  {/* MULTI-OS NATIVE APP ARCHITECTURE & BUILD PLAN (Android, iOS, Windows, macOS, Linux — ARM64 & x86_64) */}
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] space-y-3">
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--accent)]">
-                      Native App Plan: Android, iOS, Windows, macOS &amp; Linux (ARM64 &amp; x86_64)
-                    </h4>
-                    <div className="space-y-2.5 text-[11px] leading-relaxed">
-                      <div className="p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-1">
-                        <div className="font-bold text-[var(--text-main)]">
-                          1. Android (.apk / .aab) &amp; iOS (.ipa) — Capacitor 6
-                        </div>
-                        <p className="opacity-80">
-                          Wraps this Vite build into native Android Studio &amp; Xcode projects with full offline storage, DeX multi-window resize support, and foldable continuity.
-                        </p>
-                        <pre className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] font-mono text-[10px] overflow-x-auto">
-{`npm i @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
-npx cap init "Web Books" com.afeed.webbooks --web-dir=dist
-npm run build && npx cap add android && npx cap add ios && npx cap sync`}
-                        </pre>
-                        <p className="opacity-75 text-[10px]">
-                          • <strong>Android ARM64 &amp; x86_64:</strong> In <code className="font-mono">android/app/build.gradle</code> set <code className="font-mono">ndk.abiFilters &quot;arm64-v8a&quot;, &quot;x86_64&quot;</code> for phones/foldables (ARM64) and Chromebooks/Android PC (x86_64).<br />
-                          • <strong>iOS ARM64:</strong> Archive in Xcode for iPhone &amp; iPad (<code className="font-mono">arm64</code>).
-                        </p>
-                      </div>
-
-                      <div className="p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] space-y-1">
-                        <div className="font-bold text-[var(--text-main)]">
-                          2. Windows, macOS &amp; Linux (ARM64 + x86_64) — Tauri v2 (Rust)
-                        </div>
-                        <p className="opacity-80">
-                          Compiles tiny (~6 MB) native OS binaries using the native OS WebView (WebView2 on Windows, WebKit on macOS/Linux) instead of bundling a 150 MB Electron runtime:
-                        </p>
-                        <pre className="p-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] font-mono text-[10px] overflow-x-auto">
-{`npm i -D @tauri-apps/cli@latest && npx tauri init
-# Windows x86_64 & ARM64 (.msi / .exe NSIS):
-npx tauri build --target x86_64-pc-windows-msvc
-npx tauri build --target aarch64-pc-windows-msvc
-# macOS Universal Binary (Apple Silicon ARM64 + Intel x86_64 .dmg/.app):
-npx tauri build --target universal-apple-darwin
-# Linux x86_64 & ARM64 (.deb / .AppImage / .rpm):
-npx tauri build --target x86_64-unknown-linux-gnu
-npx tauri build --target aarch64-unknown-linux-gnu`}
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] space-y-3">
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--accent)]">
-                      Instructions Manual &amp; Reading Tips
-                    </h4>
-                    <div className="space-y-2 opacity-85 leading-relaxed text-[11px]">
-                      <div>
-                        <strong>1. Three-Tier Navigation Flow:</strong> Tap any Subject &amp; Paper card → Tap Chapter → Tap Topic module to launch the reader.
-                      </div>
-                      <div>
-                        <strong>2. Collapsible Viewing Area:</strong> Scroll down (or tap the collapse chevron <span className="font-mono">^</span> in the header) to smoothly collapse the top Viewing Area into the compact sticky bar.
-                      </div>
-                      <div>
-                        <strong>3. Adaptive DeX, Foldable &amp; Passport Layout:</strong> Automatically scales across Phones (1 col), Passport Square Foldables (2 cols + compact header), Book Foldables/Tablets (3 cols), and DeX / Desktop PCs (4–5 cols).
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-subtle)] space-y-2">
-                    <div className="font-bold text-xs">MIT Open Source License</div>
-                    <pre className="p-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-mono whitespace-pre-wrap leading-tight opacity-75 max-h-36 overflow-y-auto">
-{`MIT License
-Copyright (c) 2026 Afeed
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.`}
-                    </pre>
-                    <p className="text-[10px] opacity-65">
-                      Connected to GitHub with full README.md instructions manual and LICENSE file ready to share.
-                    </p>
-                  </div>
-                </div>
-              )}
+            <div className="px-6 py-3 border-t border-[var(--border)] bg-[var(--surface-subtle)] flex items-center justify-between">
+              <span className="text-[11px] opacity-60">Shortcuts are disabled while typing in inputs</span>
+              <button
+                type="button"
+                onClick={() => setShortcutsModalOpen(false)}
+                className="px-4 py-1.5 rounded-xl btn-accent text-xs font-semibold"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* =====================================================================
-          ADMIN ONLY: UPLOAD / BUILD NEW TOPIC PAGE MODAL
+          DEDICATED PHONE & DESKTOP SETTINGS PAGE
+          - Profile Card -> Theme (4 Modes + Auto-Detect + Deep G2 Curve Radius)
+          - Visual & Animation Management (Adaptive Screen, 60fps Lite, Reduce Blur/Animation/Transition, Keyboard Shortcuts)
+          - FAQ, Feedback & Moderator Request
+          - Moderation & Admin Governance (Main Admin, Secondary Admin, Moderator + Content Approval Queue)
+          - User Manual, Reading Guide & MIT License
          ===================================================================== */}
-      {uploadModalOpen && isAdminUser && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 view-transition-enter">
-          <div className="w-full max-w-2xl rounded-[26px] border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      {settingsOpen && (
+        <SettingsPage
+          onClose={() => setSettingsOpen(false)}
+          activeSection={settingsSection}
+          setActiveSection={setSettingsSection}
+          user={user}
+          userRole={userRole}
+          handleGoogleLogin={handleGoogleLogin}
+          handleLogout={handleLogout}
+          authErrorDetails={authErrorDetails}
+          firebaseProjectId={FIREBASE_PROJECT_ID}
+          studentClass={studentClass}
+          setStudentClass={setStudentClass}
+          schoolName={schoolName}
+          setSchoolName={setSchoolName}
+          phoneInput={phoneInput}
+          setPhoneInput={setPhoneInput}
+          profileSaving={profileSaving}
+          profileStatusMsg={profileStatusMsg}
+          handleSaveProfile={handleSaveProfile}
+          theme={theme}
+          onSelectTheme={handleSelectTheme}
+          isThemeAutoDetect={isThemeAutoDetect}
+          onEnableThemeAutoDetect={handleEnableThemeAutoDetect}
+          fontScale={fontScale}
+          setFontScale={setFontScale}
+          curveProfile={curveProfile}
+          setCurveProfile={setCurveProfile}
+          curveRadiusPreset={curveRadiusPreset}
+          setCurveRadiusPreset={setCurveRadiusPreset}
+          handleToggleAllDropdowns={handleToggleAllDropdowns}
+          deviceProfile={deviceProfile}
+          viewportSize={viewportSize}
+          manualViewingCollapsed={manualViewingCollapsed}
+          setManualViewingCollapsed={setManualViewingCollapsed}
+          efficiencyMode={efficiencyMode}
+          setEfficiencyMode={setEfficiencyMode}
+          isLowEndEfficiencyActive={isLowEndEfficiencyActive}
+          visualSettings={visualSettings}
+          setVisualSettings={setVisualSettings}
+          onOpenShortcutsModal={() => {
+            setSettingsOpen(false);
+            setShortcutsModalOpen(true);
+          }}
+          activePageTitle={activePage.title}
+          feedbackRating={feedbackRating}
+          setFeedbackRating={setFeedbackRating}
+          feedbackMessage={feedbackMessage}
+          setFeedbackMessage={setFeedbackMessage}
+          feedbackSubmitting={feedbackSubmitting}
+          feedbackStatusMsg={feedbackStatusMsg}
+          handleSubmitFeedback={handleSubmitFeedback}
+          myFeedbacks={myFeedbacks}
+          handleDeleteFeedback={handleDeleteFeedback}
+          secondaryAdminEmails={selectiveAdminEmails}
+          moderatorEmails={moderatorEmails}
+          roleRequests={roleRequests}
+          pendingSubmissions={pendingSubmissions}
+          onSubmitRoleRequest={handleSubmitRoleRequest}
+          onApproveRoleRequest={handleApproveRoleRequest}
+          onRejectRoleRequest={handleRejectRoleRequest}
+          onAddSecondaryAdminEmail={handleAddSecondaryAdminEmail}
+          onRemoveSecondaryAdminEmail={handleRemoveSecondaryAdminEmail}
+          onAddModeratorEmail={handleAddModeratorEmail}
+          onRemoveModeratorEmail={handleRemoveModeratorEmail}
+          onApprovePendingSubmission={handleApprovePendingSubmission}
+          onRejectPendingSubmission={handleRejectPendingSubmission}
+          onOpenUploadModal={() => {
+            setSettingsOpen(false);
+            setUploadModalOpen(true);
+          }}
+          onOpenRawCodeModal={() => {
+            setSettingsOpen(false);
+            setRawCodeModalOpen(true);
+          }}
+          showShortcutToast={showShortcutToast}
+          allPages={allPages}
+          currentVersion={APP_CURRENT_VERSION}
+          appVariant={appVariant}
+          releaseSummary={releaseSummary}
+          releasesList={releasesList}
+          preferPrerelease={preferPrerelease}
+          setPreferPrerelease={setPreferPrerelease}
+          checkingUpdates={checkingUpdates}
+          lastCheckedAt={lastCheckedAt}
+          onCheckForUpdates={() => void handleCheckForUpdates(false)}
+        />
+      )}
+
+      {/* =====================================================================
+          MODERATOR & ADMIN: UPLOAD / SUBMIT NEW TOPIC PAGE MODAL
+          - Main Admin & Secondary Admin: Publishes immediately
+          - Moderator: Submits to Pending Content Approval Queue for Admin review
+         ===================================================================== */}
+      {uploadModalOpen && canSubmitTopicContent(userRole) && (
+        <div
+          data-testid="upload-topic-modal"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 view-transition-enter"
+        >
+          <div className="w-full max-w-2xl rounded-[38px] border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold">
-                  Admin: Upload / Build New Topic Page
+                  {doesContentRequireApproval(userRole)
+                    ? 'Moderator: Submit New Topic Page for Approval'
+                    : 'Admin: Upload / Build New Topic Page'}
                 </h2>
                 <p className="text-xs opacity-65">
-                  Organize by Class → Subject → Paper → Chapter → Topic
+                  {doesContentRequireApproval(userRole)
+                    ? 'Submitted topics enter the Moderation Queue to be checked & approved by Main or Secondary Admin'
+                    : 'Organize by Class → Subject → Paper → Chapter → Topic (Publishes Immediately)'}
                 </p>
               </div>
               <button
@@ -4020,6 +4645,12 @@ The above copyright notice and this permission notice shall be included in all c
               onSubmit={handleCreateTopicPage}
               className="p-6 overflow-y-auto space-y-4 text-xs"
             >
+              {doesContentRequireApproval(userRole) && (
+                <div className="p-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 text-[11px] leading-relaxed">
+                  <strong>Moderator Content Review Policy:</strong> When you submit new content as a Moderator, it is first placed in the <strong>Pending Content Approval Queue</strong>. Once the Main Admin or a Secondary Admin verifies and approves the content, it is published live to the textbook library.
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block opacity-75 mb-1 font-semibold">
@@ -4119,7 +4750,9 @@ The above copyright notice and this permission notice shall be included in all c
                   type="submit"
                   className="px-5 py-2 rounded-2xl btn-accent"
                 >
-                  Save &amp; Publish Page
+                  {doesContentRequireApproval(userRole)
+                    ? 'Submit for Admin Approval'
+                    : 'Save & Publish Page'}
                 </button>
               </div>
             </form>
@@ -4132,7 +4765,7 @@ The above copyright notice and this permission notice shall be included in all c
          ===================================================================== */}
       {rawCodeModalOpen && isAdminUser && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 view-transition-enter">
-          <div className="w-full max-w-3xl rounded-[26px] border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="w-full max-w-3xl rounded-[38px] border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
               <h2 className="text-base font-bold">
                 Admin: Raw HTML Sections &amp; Navigation Links

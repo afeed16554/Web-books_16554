@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
+import { doc, getDocFromServer, getFirestore, setLogLevel } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Flexible runtime configuration supporting both environment variables and config file
@@ -13,6 +13,9 @@ const runtimeConfig = {
   appId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_APP_ID) || firebaseConfig.appId,
   firestoreDatabaseId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_DATABASE_ID) || firebaseConfig.firestoreDatabaseId,
 };
+
+// Set Firestore log level to silent so background connection retries and offline states don't emit console errors
+setLogLevel('silent');
 
 const app = initializeApp(runtimeConfig);
 export const db = getFirestore(app, runtimeConfig.firestoreDatabaseId);

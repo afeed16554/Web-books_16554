@@ -1,8 +1,7 @@
 @import "tailwindcss";
 
 :root,
-[data-theme="oled"],
-[data-theme="dark"] {
+[data-theme="oled"] {
   --bg-primary: #000000;
   --bg-card: #121215;
   --bg-rail: #141418;
@@ -25,6 +24,74 @@
   --success-text: #6ee7b7;
   --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   --font-scale: 18px;
+  --curve-shape: squircle;
+  --curve-smoothing: 1;
+  --curve-radius-card: 38px;
+  --curve-radius-doc: 32px;
+  --curve-radius-inner: 26px;
+  --curve-radius-btn: 20px;
+}
+
+/* Comfortable Dark Mode (Refined Charcoal Gray & Lightgrey-Black — zero blue tint) */
+[data-theme="dark"] {
+  --bg-primary: #121214;
+  --bg-card: #1c1c20;
+  --bg-rail: #17171a;
+  --surface-subtle: #27272c;
+  --text-main: #f4f4f6;
+  --text-secondary: #d1d1d6;
+  --text-muted: #9e9ea7;
+  --accent: #e4e4e7;
+  --accent-contrast: #121214;
+  --accent-soft: rgba(228, 228, 231, 0.12);
+  --border: #323238;
+  --caution-bg: rgba(245, 158, 11, 0.14);
+  --caution-border: #f59e0b;
+  --caution-text: #fde68a;
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --danger-border: rgba(239, 68, 68, 0.45);
+  --danger-text: #fca5a5;
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --success-border: rgba(16, 185, 129, 0.4);
+  --success-text: #6ee7b7;
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+/* =====================================================================
+   G2 CONTINUOUS CURVATURE (SQUIRCLE / SUPERELLIPSE) PROFILE SYSTEM
+   Increased default radius (38px) so G2 superellipse corners look deeply,
+   smoothly curved and comfortable on the eyes without corner pinch.
+   ===================================================================== */
+:root,
+[data-curve="g2"] {
+  --curve-shape: squircle;
+  --curve-smoothing: 1;
+}
+
+[data-curve="classic"] {
+  --curve-shape: round;
+  --curve-smoothing: 0;
+}
+
+[data-curve-radius="standard"] {
+  --curve-radius-card: 28px;
+  --curve-radius-doc: 24px;
+  --curve-radius-inner: 20px;
+  --curve-radius-btn: 16px;
+}
+
+[data-curve-radius="deep"] {
+  --curve-radius-card: 38px;
+  --curve-radius-doc: 32px;
+  --curve-radius-inner: 26px;
+  --curve-radius-btn: 20px;
+}
+
+[data-curve-radius="ultra"] {
+  --curve-radius-card: 46px;
+  --curve-radius-doc: 38px;
+  --curve-radius-inner: 30px;
+  --curve-radius-btn: 24px;
 }
 
 /* Clean Light Mode (#f2f2f7 canvas + #ffffff focus blocks) */
@@ -80,10 +147,12 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -97,6 +166,27 @@ body {
   overflow-x: clip;
   margin: 0;
   padding: 0;
+  overscroll-behavior-y: none;
+}
+
+button,
+a,
+summary,
+select,
+input,
+textarea {
+  touch-action: manipulation;
+}
+
+/* Full-screen Settings Page Container — Android APK, Foldable, Tablet & Desktop Safe Area */
+.wb-settings-page-shell {
+  height: 100vh;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  overscroll-behavior: contain;
 }
 
 /* Theme-safe Primary Accent Button (Never black text on dark blue/red in Light or Reading mode) */
@@ -192,11 +282,14 @@ body {
   }
 }
 
-/* Pill Breadcrumb Bar */
+/* Pill Breadcrumb Bar with G2 Continuous Curve */
 .wb-breadcrumb-pill {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 9999px;
+  corner-shape: var(--curve-shape, squircle);
+  -webkit-corner-shape: var(--curve-shape, squircle);
+  -electron-corner-smoothing: var(--curve-smoothing, 1);
   padding: 0.55rem 1.15rem;
   display: flex;
   align-items: center;
@@ -205,28 +298,36 @@ body {
   box-shadow: var(--card-shadow);
 }
 
-/* Focus Block Container (Grouped List or Singular Block) — 26px Squircle Radius */
+/* Focus Block Container (Grouped List or Singular Block) — Deep G2 Squircle Radius */
 .wb-focus-block {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 26px;
+  border-radius: var(--curve-radius-card, 38px);
+  corner-shape: var(--curve-shape, squircle);
+  -webkit-corner-shape: var(--curve-shape, squircle);
+  -electron-corner-smoothing: var(--curve-smoothing, 1);
   overflow: hidden;
   box-shadow: var(--card-shadow);
-  transition: background-color 0.22s ease, border-color 0.22s ease;
+  transition: background-color 0.22s ease, border-color 0.22s ease, border-radius 0.22s ease;
+  transform: translateZ(0);
 }
 
-/* Focus Block Card (Card Grid / Multi-Column Grid) — 26px Squircle Radius */
+/* Focus Block Card (Card Grid / Multi-Column Grid) — Deep G2 Squircle Radius */
 .wb-focus-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 26px;
-  padding: 1.3rem 1.35rem;
+  border-radius: var(--curve-radius-card, 38px);
+  corner-shape: var(--curve-shape, squircle);
+  -webkit-corner-shape: var(--curve-shape, squircle);
+  -electron-corner-smoothing: var(--curve-smoothing, 1);
+  padding: 1.4rem 1.45rem;
   box-shadow: var(--card-shadow);
   backface-visibility: hidden;
   transform: translateZ(0);
   transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.22s ease,
-    background-color 0.22s ease;
+    background-color 0.22s ease,
+    border-radius 0.22s ease;
 }
 
 .wb-focus-card:hover {
@@ -239,17 +340,21 @@ body {
   transform: scale(0.985);
 }
 
-/* Document Note Card (with high-contrast colored top header banner) */
+/* Document Note Card (with high-contrast colored top header banner) — Deep G2 Squircle */
 .wb-note-doc-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--curve-radius-doc, 32px);
+  corner-shape: var(--curve-shape, squircle);
+  -webkit-corner-shape: var(--curve-shape, squircle);
+  -electron-corner-smoothing: var(--curve-smoothing, 1);
   overflow: hidden;
   box-shadow: var(--card-shadow);
   backface-visibility: hidden;
   transform: translateZ(0);
   transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.22s ease;
+    border-color 0.22s ease,
+    border-radius 0.22s ease;
 }
 
 .wb-note-doc-card:hover {
@@ -293,7 +398,7 @@ body {
      CSS containment (contain: layout paint) so internal text, buttons, and
      folder trees NEVER reflow or re-wrap during open/close animations!
    - On Mobile (< 768px): Pure GPU compositor slide (translate3d + opacity).
-   - On Desktop / DeX (>= 768px): Synchronized spring curve matching the
+   - On Tablet & Desktop (>= 768px): Synchronized spring curve matching the
      Viewing Area (cubic-bezier(0.22, 1, 0.36, 1)).
    ===================================================================== */
 .wb-sidebar {
@@ -401,20 +506,79 @@ body {
 .topic-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 26px;
-  padding: clamp(1.25rem, 2.5vw, 2.25rem);
+  border-radius: var(--curve-radius-card, 38px);
+  corner-shape: var(--curve-shape, squircle);
+  -webkit-corner-shape: var(--curve-shape, squircle);
+  -electron-corner-smoothing: var(--curve-smoothing, 1);
+  padding: clamp(1.35rem, 2.5vw, 2.35rem);
   margin-bottom: 1.5rem;
   scroll-margin-top: 4.5rem;
   box-shadow: var(--card-shadow);
   content-visibility: auto;
   contain-intrinsic-size: auto 460px;
   contain: layout style;
-  transition: border-color 0.22s ease, background-color 0.22s ease;
+  transition: border-color 0.22s ease, background-color 0.22s ease, border-radius 0.22s ease;
+  transform: translateZ(0);
+}
+
+/* Settings Group Card & Dotted Divider */
+.wb-settings-group {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--curve-radius-card, 38px);
+  corner-shape: var(--curve-shape, squircle);
+  -webkit-corner-shape: var(--curve-shape, squircle);
+  -electron-corner-smoothing: var(--curve-smoothing, 1);
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+  transform: translateZ(0);
+}
+
+.wb-dotted-divider {
+  border-bottom: 2px dotted var(--border);
+  margin: 0.45rem 0.75rem;
+  opacity: 0.65;
+}
+
+/* Comprehensive G2 Continuous Curvature Utility & Application Classes */
+.g2-curve,
+.wb-g2-target,
+[data-curve="g2"] .wb-focus-block,
+[data-curve="g2"] .wb-focus-card,
+[data-curve="g2"] .wb-note-doc-card,
+[data-curve="g2"] .topic-section,
+[data-curve="g2"] .wb-settings-group,
+[data-curve="g2"] .wb-breadcrumb-pill,
+[data-curve="g2"] .rounded-3xl,
+[data-curve="g2"] .rounded-2xl,
+[data-curve="g2"] .rounded-xl,
+[data-curve="g2"] .btn-accent,
+[data-curve="g2"] .modal-sheet,
+[data-curve="g2"] .alert-danger,
+[data-curve="g2"] .badge-success,
+[data-curve="g2"] details.interactive-drop,
+[data-curve="g2"] input[type="text"],
+[data-curve="g2"] input[type="search"] {
+  corner-shape: var(--curve-shape, squircle);
+  -webkit-corner-shape: var(--curve-shape, squircle);
+  -electron-corner-smoothing: var(--curve-smoothing, 1);
+}
+
+[data-curve="g2"] .rounded-3xl {
+  border-radius: var(--curve-radius-card, 38px);
+}
+
+[data-curve="g2"] .rounded-2xl {
+  border-radius: var(--curve-radius-inner, 26px);
+}
+
+[data-curve="g2"] .rounded-xl {
+  border-radius: var(--curve-radius-btn, 20px);
 }
 
 /* =====================================================================
-   LOW-END DEVICE EFFICIENCY MODE (60fps Budget Phone & Low-RAM Optimization)
-   Eliminates expensive offscreen GPU Gaussian blur passes & multi-layer shadows
+   LOW-END DEVICE EFFICIENCY & GRANULAR VISUAL/ANIMATION MANAGEMENT
+   Allows independent or auto-detected reduction of Animations, Blur, and Transitions
    ===================================================================== */
 [data-efficiency="low-end"] {
   --card-shadow: none;
@@ -423,13 +587,32 @@ body {
 [data-efficiency="low-end"] header,
 [data-efficiency="low-end"] .backdrop-blur-md,
 [data-efficiency="low-end"] .backdrop-blur-sm,
-[data-efficiency="low-end"] .backdrop-blur-\[1px\] {
+[data-efficiency="low-end"] .backdrop-blur-\[1px\],
+[data-reduce-blur="true"] header,
+[data-reduce-blur="true"] .backdrop-blur-md,
+[data-reduce-blur="true"] .backdrop-blur-sm,
+[data-reduce-blur="true"] .backdrop-blur-\[1px\] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-[data-efficiency="low-end"] header {
+[data-efficiency="low-end"] header,
+[data-reduce-blur="true"] header {
   background-color: var(--bg-primary) !important;
+}
+
+[data-reduce-animation="true"] *,
+[data-reduce-animation="true"] *::before,
+[data-reduce-animation="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+[data-reduce-transition="true"] *,
+[data-reduce-transition="true"] *::before,
+[data-reduce-transition="true"] *::after {
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

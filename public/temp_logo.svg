@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="wbBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1329"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="wbGlobeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="60%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="wbBookLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="wbBookRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="wbPagesWhite" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <radialGradient id="wbAura" cx="50%" cy="36%" r="45%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Squircle App Icon Container -->
+  <rect width="512" height="512" rx="116" fill="url(#wbBgGrad)"/>
+  <rect x="12" y="12" width="488" height="488" rx="106" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-opacity="0.18"/>
+
+  <!-- Radial Background Glow -->
+  <circle cx="256" cy="180" r="140" fill="url(#wbAura)"/>
+
+  <!-- Core Emblem: Open Book + Web Globe -->
+  <g transform="translate(0, 0)">
+    <!-- Backing Book Cover Depth / Shadow -->
+    <path d="M 88 382 C 148 406 220 404 256 388 C 292 404 364 406 424 382 C 434 380 440 370 436 360 L 416 238 C 414 230 406 226 398 228 C 348 244 286 242 256 230 C 226 242 164 244 114 228 C 106 226 98 230 96 238 L 76 360 C 72 370 78 380 88 382 Z" fill="#0369a1" fill-opacity="0.35"/>
+
+    <!-- Left Book Wing (Open Page Block) -->
+    <path d="M 256 376 C 218 390 148 392 98 368 C 92 365 88 359 90 352 L 108 228 C 110 221 116 217 123 219 C 168 233 222 230 256 216 Z" fill="url(#wbBookLeft)"/>
+
+    <!-- Right Book Wing (Open Page Block) -->
+    <path d="M 256 376 C 294 390 364 392 414 368 C 420 365 424 359 422 352 L 404 228 C 402 221 396 217 389 219 C 344 233 290 230 256 216 Z" fill="url(#wbBookRight)"/>
+
+    <!-- Open White Inner Pages (Floating layered leaf effect) -->
+    <path d="M 254 364 C 218 376 156 376 112 354 L 126 238 C 164 250 216 248 254 232 Z" fill="url(#wbPagesWhite)" fill-opacity="0.94"/>
+    <path d="M 258 364 C 294 376 356 376 400 354 L 386 238 C 348 250 296 248 258 232 Z" fill="url(#wbPagesWhite)" fill-opacity="0.94"/>
+
+    <!-- Central Spine Accent -->
+    <path d="M 254 224 L 254 382 A 2 2 0 0 0 258 382 L 258 224 Z" fill="#ffffff" fill-opacity="0.75"/>
+
+    <!-- Left Page Subtle Reading Ruled Accents -->
+    <path d="M 140 268 C 172 278 214 276 242 264" stroke="#0284c7" stroke-width="4.5" stroke-linecap="round" fill="none" stroke-opacity="0.6"/>
+    <path d="M 134 298 C 168 308 212 306 242 294" stroke="#0284c7" stroke-width="4.5" stroke-linecap="round" fill="none" stroke-opacity="0.6"/>
+    <path d="M 128 328 C 164 338 210 336 242 324" stroke="#0284c7" stroke-width="4.5" stroke-linecap="round" fill="none" stroke-opacity="0.6"/>
+
+    <!-- Right Page Subtle Reading Ruled Accents -->
+    <path d="M 270 264 C 298 276 340 278 372 268" stroke="#2563eb" stroke-width="4.5" stroke-linecap="round" fill="none" stroke-opacity="0.6"/>
+    <path d="M 270 294 C 300 306 344 308 378 298" stroke="#2563eb" stroke-width="4.5" stroke-linecap="round" fill="none" stroke-opacity="0.6"/>
+    <path d="M 270 324 C 302 336 348 338 384 328" stroke="#2563eb" stroke-width="4.5" stroke-linecap="round" fill="none" stroke-opacity="0.6"/>
+
+    <!-- RADIANT WEB GLOBE (Centered prominently above & cradled by the open book) -->
+    <g transform="translate(256, 154)">
+      <!-- Outer Globe Shield / Aura -->
+      <circle cx="0" cy="0" r="74" fill="#0f172a" stroke="url(#wbGlobeGrad)" stroke-width="7.5"/>
+      <circle cx="0" cy="0" r="74" fill="url(#wbGlobeGrad)" fill-opacity="0.16"/>
+
+      <!-- Longitudinal Ellipses (Globe grid) -->
+      <ellipse cx="0" cy="0" rx="38" ry="74" fill="none" stroke="#38bdf8" stroke-width="5.5"/>
+      <ellipse cx="0" cy="0" rx="14" ry="74" fill="none" stroke="#38bdf8" stroke-width="4" stroke-opacity="0.8"/>
+
+      <!-- Prime Meridian -->
+      <line x1="0" y1="-74" x2="0" y2="74" stroke="#38bdf8" stroke-width="5" stroke-linecap="round"/>
+
+      <!-- Equator -->
+      <line x1="-74" y1="0" x2="74" y2="0" stroke="#38bdf8" stroke-width="5.5" stroke-linecap="round"/>
+
+      <!-- Latitudes (Curved parallels) -->
+      <path d="M -60 -36 Q 0 -18 60 -36" fill="none" stroke="#38bdf8" stroke-width="4.5" stroke-linecap="round" stroke-opacity="0.85"/>
+      <path d="M -60 36 Q 0 18 60 36" fill="none" stroke="#38bdf8" stroke-width="4.5" stroke-linecap="round" stroke-opacity="0.85"/>
+
+      <!-- Orbital Connection Sparks -->
+      <circle cx="0" cy="-74" r="5" fill="#ffffff"/>
+      <circle cx="74" cy="0" r="5" fill="#38bdf8"/>
+      <circle cx="-74" cy="0" r="5" fill="#38bdf8"/>
+    </g>
+
+    <!-- Base Pedestal / Book Foundation Light Arc -->
+    <path d="M 206 424 C 238 434 274 434 306 424" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" fill="none" stroke-opacity="0.45"/>
+  </g>
+</svg>
