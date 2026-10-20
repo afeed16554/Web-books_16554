@@ -697,5 +697,27 @@ test('User Manual & MIT License: Official License text is complete, valid, and a
   );
 });
 
+test('Android App Drawer Adaptive Icon matches the in-app Web Books Globe Logo', async () => {
+  const {
+    ANDROID_ADAPTIVE_ICON_XML,
+    ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML,
+    ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML,
+  } = await import('./capacitorAndroidIconPlugin.ts');
 
+  assert.ok(
+    ANDROID_ADAPTIVE_ICON_XML.includes('@drawable/ic_launcher_background') &&
+      ANDROID_ADAPTIVE_ICON_XML.includes('@drawable/ic_launcher_foreground'),
+    'Adaptive icon must bind to Web Books vector background and foreground drawables'
+  );
+  assert.ok(
+    ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML.includes('#FF0F172A') &&
+      ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML.includes('#FF020617'),
+    'Adaptive icon background must use the dark navy gradient (#0f172a -> #020617)'
+  );
+  assert.ok(
+    ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML.includes('#FF38BDF8') &&
+      ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML.includes('#FF121218'),
+    'Adaptive icon foreground must render the notebook card (#121218) and sky-blue header/globe (#38bdf8)'
+  );
+});
 

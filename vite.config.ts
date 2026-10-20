@@ -2,11 +2,12 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {webBooksNativeIconsPlugin} from './src/utils/capacitorAndroidIconPlugin.ts';
 
 export default defineConfig(() => {
   return {
     base: process.env.GITHUB_ACTIONS ? '/Web-books_16554/' : '/',
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), webBooksNativeIconsPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
