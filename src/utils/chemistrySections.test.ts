@@ -541,24 +541,30 @@ test('Version System: Semantic version comparison, pre-release detection, and ap
   assert.equal(iosWeb.variant, 'ios-web');
   assert.equal(iosWeb.platformFamily, 'iOS');
 
-  // Semver & Pre-release parsing
-  const stableVer = parseSemver('v1.0.1');
+  // Semver & Pre-release parsing (both hyphenated and compact tags like v1.0.2pre)
+  const stableVer = parseSemver('v1.0.2');
   assert.equal(stableVer.isPrerelease, false);
-  assert.equal(stableVer.cleanTag, 'v1.0.1');
+  assert.equal(stableVer.cleanTag, 'v1.0.2');
+
+  const compactPreVer = parseSemver('v1.0.2pre');
+  assert.equal(compactPreVer.isPrerelease, true);
+  assert.equal(compactPreVer.prerelease, 'pre');
+  assert.equal(compactPreVer.cleanTag, 'v1.0.2pre');
+  assert.equal(compareSemver('v1.0.2', 'v1.0.2pre'), 1);
 
   const betaVer = parseSemver('v1.1.0-beta.1');
   assert.equal(betaVer.isPrerelease, true);
   assert.equal(betaVer.prerelease, 'beta.1');
 
-  assert.equal(compareSemver('v1.0.1', '1.0.0'), 1);
+  assert.equal(compareSemver('v1.0.2', '1.0.1'), 1);
   assert.equal(compareSemver('v1.1.0', 'v1.1.0-beta.1'), 1);
-  assert.equal(compareSemver('v1.1.0-beta.1', 'v1.0.1'), 1);
+  assert.equal(compareSemver('v1.1.0-beta.1', 'v1.0.2'), 1);
 
   // Release evaluation against current installed version baseline
   const statusCurrent = evaluateReleaseUpdateStatus(APP_CURRENT_VERSION, FALLBACK_GITHUB_RELEASES, false);
   assert.equal(statusCurrent.hasUpdate, false);
   assert.equal(statusCurrent.hasStableUpdate, false);
-  assert.equal(statusCurrent.targetRelease.tagName, 'v1.0.1');
+  assert.equal(statusCurrent.targetRelease.tagName, 'v1.0.2');
   assert.equal(statusCurrent.repoUrl, GITHUB_REPO_URL);
 
   // Dynamic newer release evaluation (e.g. When fetched live from GitHub API)
@@ -571,14 +577,6 @@ test('Version System: Semantic version comparison, pre-release detection, and ap
       publishedAt: '2026-10-19T05:30:00Z',
       assets: [],
     },
-    {
-      tagName: 'v1.0.1',
-      name: 'v1.0.1',
-      htmlUrl: `${GITHUB_RELEASES_URL}/tag/v1.0.1`,
-      prerelease: false,
-      publishedAt: '2026-10-18T17:14:54Z',
-      assets: [],
-    },
     ...FALLBACK_GITHUB_RELEASES,
   ];
 
@@ -586,11 +584,11 @@ test('Version System: Semantic version comparison, pre-release detection, and ap
   assert.equal(statusStable.hasUpdate, true);
   assert.equal(statusStable.hasStableUpdate, true);
   assert.equal(statusStable.hasPrereleaseUpdate, true);
-  assert.equal(statusStable.targetRelease.tagName, 'v1.0.1');
+  assert.equal(statusStable.targetRelease.tagName, 'v1.0.2');
   assert.equal(statusStable.isTargetPrerelease, false);
 
   // Pre-release Beta channel evaluation
-  const statusBeta = evaluateReleaseUpdateStatus('1.0.1', mockReleases, true);
+  const statusBeta = evaluateReleaseUpdateStatus('1.0.2', mockReleases, true);
   assert.equal(statusBeta.hasUpdate, true);
   assert.equal(statusBeta.isTargetPrerelease, true);
   assert.equal(statusBeta.targetRelease.tagName, 'v1.1.0-beta.1');
@@ -720,4 +718,74 @@ test('Android App Drawer Adaptive Icon matches the in-app Web Books Globe Logo',
     'Adaptive icon foreground must render the notebook card (#121218) and sky-blue header/globe (#38bdf8)'
   );
 });
+
+test('Permanent Google Sign-In Helper & Native Android OAuth Bridge', async () => {
+  const {
+    AI_STUDIO_BUILD_GUARDRAILS_PROMPT,
+    buildDirectGoogleOAuthUrl,
+    parseGoogleAuthCallbackTokens,
+  } = await import('./googleAuthHelper.ts');
+  const { ANDROID_MAIN_ACTIVITY_JAVA } = await import(
+    './capacitorAndroidIconPlugin.ts'
+  );
+
+  // 1. Direct OAuth URL bypasses sessionStorage-dependent starter step
+  const oauthUrl = buildDirectGoogleOAuthUrl({
+    clientId:
+      '937406227590-6qalufn1bafkp6ifoaq20kpaof6i4a9r.apps.googleusercontent.com',
+    authDomain: 'pelagic-subject-fpnh2.firebaseapp.com',
+    nonce: 'nonce_test_123',
+    state: 'state_test_456',
+  });
+  assert.ok(
+    oauthUrl.startsWith('https://accounts.google.com/o/oauth2/v2/auth?'),
+    'Direct OAuth URL must target Google OAuth2 endpoint directly'
+  );
+  assert.ok(
+    oauthUrl.includes(
+      'redirect_uri=https%3A%2F%2Fpelagic-subject-fpnh2.firebaseapp.com%2F__%2Fauth%2Fhandler'
+    ),
+    'Direct OAuth URL must use the authorized Firebase redirect_uri'
+  );
+  assert.ok(
+    oauthUrl.includes('response_type=token+id_token'),
+    'Direct OAuth URL must request both access_token and id_token'
+  );
+
+  // 2. Callback URL parser extracts access_token and id_token from full redirect URL
+  const parsedFromRedirect = parseGoogleAuthCallbackTokens(
+    'https://pelagic-subject-fpnh2.firebaseapp.com/__/auth/handler#state=abc&access_token=ya29.a0AfH6SMBx123&token_type=Bearer&id_token=eyJhbGci.eyJzdWIi.sig123'
+  );
+  assert.equal(parsedFromRedirect.accessToken, 'ya29.a0AfH6SMBx123');
+  assert.equal(parsedFromRedirect.idToken, 'eyJhbGci.eyJzdWIi.sig123');
+  assert.equal(parsedFromRedirect.error, null);
+
+  // 3. Raw token parsing
+  const parsedRawAccess = parseGoogleAuthCallbackTokens('ya29.rawAccessToken99');
+  assert.equal(parsedRawAccess.accessToken, 'ya29.rawAccessToken99');
+  assert.equal(parsedRawAccess.idToken, null);
+
+  // 4. Native Android MainActivity supports multiple windows, strips ; wv, and intercepts /__/auth/handler
+  assert.ok(
+    ANDROID_MAIN_ACTIVITY_JAVA.includes('setSupportMultipleWindows(true)'),
+    'Android MainActivity must enable multiple windows for OAuth popups'
+  );
+  assert.ok(
+    ANDROID_MAIN_ACTIVITY_JAVA.includes('.replace("; wv", "")'),
+    'Android MainActivity must strip WebView marker so Google OAuth does not block User-Agent'
+  );
+  assert.ok(
+    ANDROID_MAIN_ACTIVITY_JAVA.includes('WebBooksAndroidAuth') &&
+      ANDROID_MAIN_ACTIVITY_JAVA.includes('shouldInterceptRequest'),
+    'Android MainActivity must expose WebBooksAndroidAuth bridge and intercept /__/auth/handler return callback'
+  );
+
+  // 5. AI Studio Build Guardrails includes Rule 6 for versioning only when told "ready"
+  assert.ok(
+    AI_STUDIO_BUILD_GUARDRAILS_PROMPT.includes('VERSIONING & RELEASE RULE') &&
+      AI_STUDIO_BUILD_GUARDRAILS_PROMPT.includes('ready'),
+    'Guardrails prompt must instruct only updating version when told ready with beta or stable'
+  );
+});
+
 

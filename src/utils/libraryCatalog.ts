@@ -1481,7 +1481,7 @@ export function doesContentRequireApproval(role: UserRole): boolean {
 // APP VERSION, VARIANT DETECTION, GITHUB RELEASE & NOTIFICATION SYSTEM
 // ============================================================================
 
-export const APP_CURRENT_VERSION = '1.0.1';
+export const APP_CURRENT_VERSION = '1.0.2';
 export const GITHUB_REPO_OWNER = 'afeed16554';
 export const GITHUB_REPO_NAME = 'Web-books_16554';
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
@@ -1580,6 +1580,25 @@ export interface ParsedSemver {
 
 export function parseSemver(versionStr: string): ParsedSemver {
   const raw = (versionStr || '0.0.0').trim().replace(/^v/i, '');
+  const compactMatch = raw.match(
+    /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:(-)?([a-zA-Z][\w.-]*))?$/
+  );
+  if (compactMatch) {
+    const major = Number.parseInt(compactMatch[1] || '0', 10) || 0;
+    const minor = Number.parseInt(compactMatch[2] || '0', 10) || 0;
+    const patch = Number.parseInt(compactMatch[3] || '0', 10) || 0;
+    const sep = compactMatch[4] || '';
+    const prerelease = compactMatch[5] ? compactMatch[5] : null;
+    return {
+      major,
+      minor,
+      patch,
+      prerelease,
+      isPrerelease: Boolean(prerelease),
+      cleanTag: `v${major}.${minor}.${patch}${prerelease ? `${sep}${prerelease}` : ''}`,
+    };
+  }
+
   const [corePart, ...preParts] = raw.split('-');
   const prerelease = preParts.length > 0 ? preParts.join('-') : null;
   const nums = (corePart || '0.0.0')
@@ -1599,7 +1618,7 @@ export function parseSemver(versionStr: string): ParsedSemver {
 }
 
 /**
- * Compares two semantic version strings (e.g. "v1.0.1" vs "1.0.0" or "v1.1.0-beta.1" vs "v1.1.0").
+ * Compares two semantic version strings (e.g. "v1.0.2" vs "1.0.1" or "v1.0.2pre" vs "v1.0.2").
  * Returns 1 if vA > vB, -1 if vA < vB, 0 if equal.
  */
 export function compareSemver(vA: string, vB: string): number {
@@ -1610,7 +1629,7 @@ export function compareSemver(vA: string, vB: string): number {
   if (a.minor !== b.minor) return a.minor > b.minor ? 1 : -1;
   if (a.patch !== b.patch) return a.patch > b.patch ? 1 : -1;
 
-  // Same major.minor.patch: stable release is higher than prerelease (e.g. 1.1.0 > 1.1.0-beta.1)
+  // Same major.minor.patch: stable release is higher than prerelease (e.g. 1.0.2 > 1.0.2pre)
   if (!a.isPrerelease && b.isPrerelease) return 1;
   if (a.isPrerelease && !b.isPrerelease) return -1;
   if (a.prerelease && b.prerelease && a.prerelease !== b.prerelease) {
@@ -1651,6 +1670,42 @@ export interface ReleaseUpdateSummary {
 }
 
 export const FALLBACK_GITHUB_RELEASES: GitHubReleaseInfo[] = [
+  {
+    tagName: 'v1.0.2',
+    name: 'v1.0.2 — Unified App Drawer Icon & Dark Theme Refinement',
+    htmlUrl: `${GITHUB_RELEASES_URL}/tag/v1.0.2`,
+    prerelease: false,
+    publishedAt: '2026-10-20T08:00:00Z',
+    body: 'Unified Android app drawer adaptive icon and Windows EXE icon with the in-app Web Books globe emblem, refined neutral dark theme palette, and updated version tracking.',
+    assets: [
+      {
+        name: 'app-debug.apk',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.2/app-debug.apk`,
+      },
+      {
+        name: 'Web.Books.Setup.1.0.2.exe',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.2/Web.Books.Setup.1.0.2.exe`,
+      },
+    ],
+  },
+  {
+    tagName: 'v1.0.2pre',
+    name: 'v1.0.2pre — Pre-Release Build',
+    htmlUrl: `${GITHUB_RELEASES_URL}/tag/v1.0.2pre`,
+    prerelease: true,
+    publishedAt: '2026-10-19T14:45:45Z',
+    body: 'Pre-release build for Android APK and Windows Desktop EXE.',
+    assets: [
+      {
+        name: 'app-debug.apk',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.2pre/app-debug.apk`,
+      },
+      {
+        name: 'Web.Books.Setup.1.0.0.exe',
+        browserDownloadUrl: `${GITHUB_RELEASES_URL}/download/v1.0.2pre/Web.Books.Setup.1.0.0.exe`,
+      },
+    ],
+  },
   {
     tagName: 'v1.0.1',
     name: 'v1.0.1 — Multi-Platform Release & Curvature',

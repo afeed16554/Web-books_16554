@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   onAuthStateChanged,
-  signInWithPopup,
   signOut,
   User,
 } from 'firebase/auth';
@@ -20,9 +19,9 @@ import {
   auth,
   db,
   FIREBASE_PROJECT_ID,
-  googleProvider,
   handleFirestoreError,
   OperationType,
+  signInWithGooglePermanent,
 } from './firebase';
 import {
   ALL_CLASS_LEVELS,
@@ -828,7 +827,7 @@ export default function App() {
                 size?: number;
               }>;
             }) => ({
-              tagName: r.tag_name || 'v1.0.1',
+              tagName: r.tag_name || 'v1.0.2',
               name: r.name || r.tag_name || 'Release',
               htmlUrl: r.html_url || GITHUB_RELEASES_URL,
               prerelease: Boolean(r.prerelease),
@@ -1502,7 +1501,7 @@ export default function App() {
     setAuthError('');
     setAuthErrorDetails(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithGooglePermanent();
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       let tip = '';
@@ -1517,7 +1516,14 @@ export default function App() {
       ) {
         code = 'popup-blocked';
         tip =
-          'The login popup was blocked by the browser or preview iframe. Open the app directly in a new tab or allow popups.';
+          'If your browser or preview iframe blocked the popup window, use "Direct Google Sign-In (Bypass Popup / SessionStorage)" right below to complete login.';
+      } else if (
+        errMsg.includes('missing initial state') ||
+        errMsg.includes('web-storage-unsupported')
+      ) {
+        code = 'storage-partitioned';
+        tip =
+          'Your browser partitioned or cleared sessionStorage during redirect. Use "Direct Google Sign-In (Bypass Popup / SessionStorage)" below to sign in directly.';
       } else if (errMsg.includes('auth/operation-not-allowed')) {
         code = 'operation-not-allowed';
         tip =

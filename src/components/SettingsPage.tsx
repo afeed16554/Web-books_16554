@@ -43,6 +43,11 @@ import {
   RolePermissionRequest,
   UserRole,
 } from '../utils/libraryCatalog';
+import {
+  getDirectGoogleOAuthUrl,
+  signInWithGoogleCallbackUrlOrToken,
+} from '../firebase';
+import { AI_STUDIO_BUILD_GUARDRAILS_PROMPT } from '../utils/googleAuthHelper';
 import { AppVersionSection } from './AppVersionSection';
 
 export type SettingsSectionId =
@@ -259,6 +264,21 @@ export function SettingsPage({
   const [settingsSearch, setSettingsSearch] = useState<string>('');
   const [domainCopied, setDomainCopied] = useState<boolean>(false);
   const [licenseCopied, setLicenseCopied] = useState<boolean>(false);
+  const [guardrailsCopied, setGuardrailsCopied] = useState<boolean>(false);
+  const [directAuthInput, setDirectAuthInput] = useState<string>('');
+  const [directAuthStatus, setDirectAuthStatus] = useState<string>('');
+
+  const handleCopyGuardrails = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(AI_STUDIO_BUILD_GUARDRAILS_PROMPT);
+        setGuardrailsCopied(true);
+        setTimeout(() => setGuardrailsCopied(false), 2400);
+      }
+    } catch {
+      // Fallback
+    }
+  };
 
   const handleCopyLicense = async () => {
     try {
@@ -695,7 +715,7 @@ export function SettingsPage({
                       <button
                         type="button"
                         onClick={handleGoogleLogin}
-                        className="w-full py-3 px-4 rounded-2xl btn-accent text-xs sm:text-sm"
+                        className="w-full py-3 px-4 rounded-2xl btn-accent text-xs sm:text-sm font-semibold"
                       >
                         Continue with Google
                       </button>
@@ -748,6 +768,100 @@ export function SettingsPage({
                           )}
                         </div>
                       )}
+
+                      {/* Direct Google Sign-In Fallback for Partitioned Browsers / Blocked Popups */}
+                      <details
+                        open={Boolean(authErrorDetails)}
+                        className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] p-3.5 text-xs"
+                      >
+                        <summary className="cursor-pointer font-semibold text-[var(--text-main)] select-none flex items-center justify-between">
+                          <span>
+                            Direct Google Sign-In (Bypass Popup / SessionStorage)
+                          </span>
+                          <span className="text-[11px] text-[var(--accent)]">
+                            Trouble signing in?
+                          </span>
+                        </summary>
+                        <div className="mt-3 space-y-2.5 text-[var(--text-muted)] leading-relaxed">
+                          <p>
+                            If your browser shows{' '}
+                            <code className="text-[var(--text-main)]">
+                              popup-blocked
+                            </code>{' '}
+                            or{' '}
+                            <code className="text-[var(--text-main)]">
+                              Unable to process request due to missing initial
+                              state
+                            </code>
+                            , sign in directly below without relying on browser{' '}
+                            <code>sessionStorage</code>:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <a
+                              href={getDirectGoogleOAuthUrl()}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl btn-accent text-xs font-semibold"
+                            >
+                              <span>1. Open Direct Google Login Tab ↗</span>
+                            </a>
+                          </div>
+                          <p className="text-[11px]">
+                            2. After selecting your Google account, if the tab
+                            does not close automatically, copy the full URL from
+                            that tab&apos;s address bar (which contains{' '}
+                            <code>#access_token=...</code>) and paste it below:
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              type="text"
+                              value={directAuthInput}
+                              onChange={(e) => {
+                                setDirectAuthInput(e.target.value);
+                                setDirectAuthStatus('');
+                              }}
+                              placeholder="Paste callback URL (#access_token=...) or token here"
+                              aria-label="Direct Google OAuth callback URL or token"
+                              className="flex-1 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--text-main)] text-xs focus:outline-none focus:border-[var(--accent)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!directAuthInput.trim()) {
+                                  setDirectAuthStatus(
+                                    'Please paste the redirect URL or token first.'
+                                  );
+                                  return;
+                                }
+                                setDirectAuthStatus('Verifying token...');
+                                try {
+                                  await signInWithGoogleCallbackUrlOrToken(
+                                    directAuthInput
+                                  );
+                                  setDirectAuthInput('');
+                                  setDirectAuthStatus(
+                                    'Signed in with Google!'
+                                  );
+                                } catch (e) {
+                                  setDirectAuthStatus(
+                                    e instanceof Error
+                                      ? e.message
+                                      : 'Could not verify token.'
+                                  );
+                                }
+                              }}
+                              className="px-4 py-2 rounded-xl btn-accent text-xs font-semibold shrink-0"
+                            >
+                              Verify &amp; Sign In
+                            </button>
+                          </div>
+                          {directAuthStatus && (
+                            <p className="text-[11px] font-semibold text-[var(--accent)]">
+                              {directAuthStatus}
+                            </p>
+                          )}
+                        </div>
+                      </details>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)]">
@@ -2539,6 +2653,43 @@ export function SettingsPage({
 
                   <pre className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-[11px] font-mono whitespace-pre-wrap leading-relaxed text-[var(--text-secondary)] select-all overflow-x-auto">
                     {OFFICIAL_MIT_LICENSE_TEXT}
+                  </pre>
+                </div>
+
+                {/* Chapter 6: AI Studio Build & Versioning Guardrails Prompt */}
+                <div className="wb-settings-group p-6 space-y-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]">
+                        <ShieldCheck className="w-4 h-4" />
+                      </span>
+                      <h3 className="font-bold text-sm text-[var(--text-main)]">
+                        6. AI Studio Build &amp; Versioning Guardrails (Copy-Paste Instructions)
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyGuardrails}
+                      className="px-3 py-1.5 rounded-xl btn-accent text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      {guardrailsCopied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Copied Instructions!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Instructions</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                    Use these system instructions in AI Studio so native build configs remain protected and the version number is only updated when you explicitly say <strong>&quot;ready&quot;</strong> (with beta or stable version):
+                  </p>
+                  <pre className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border)] text-[11px] font-mono whitespace-pre-wrap leading-relaxed text-[var(--text-secondary)] select-all overflow-x-auto">
+                    {AI_STUDIO_BUILD_GUARDRAILS_PROMPT}
                   </pre>
                 </div>
               </div>
