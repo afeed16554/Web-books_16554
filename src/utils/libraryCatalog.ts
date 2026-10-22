@@ -132,20 +132,26 @@ export function formatCleanReaderHeader(
   return `${cleanChapter} : ${cleanTopic}`;
 }
 
-export const ENGLISH_MAIN_TOPICS: { id: string; title: string }[] = [
-  { id: 'sec-1', title: '1. Aliphatic Hydrocarbons: Sources & Knocking' },
-  { id: 'sec-2', title: '2. Alkanes: Preparation & Identification' },
-  { id: 'sec-3', title: '3. Alkanes: Physical Properties & Halogenation' },
-  { id: 'sec-4', title: '4. Alkanes: Combustion, Pyrolysis & Reforming' },
-  { id: 'sec-5', title: '5. Alkenes: Laboratory & Industrial Preparation' },
-  { id: 'sec-6', title: '6. Electrophilic Addition & Markovnikov Rule' },
-  { id: 'sec-7', title: '7. Alkenes: Addition Reactions & Ozonolysis' },
-  { id: 'sec-8', title: '8. Alkenes: Baeyer Test, Polymerization & Tests' },
-  { id: 'sec-9', title: '9. Alkynes: Preparation from CaC2 & Dihaloalkanes' },
-  { id: 'sec-10', title: '10. Acidic Character of 1-Alkynes & Precipitate Tests' },
-  { id: 'sec-11', title: '11. Alkynes: Hydrogenation, Halogenation & Hydration' },
-  { id: 'sec-12', title: '12. Alkynes: Cyclic Polymerization & Ozonolysis' },
+const ENGLISH_TOPIC_TITLES: string[] = [
+  '1. Aliphatic Hydrocarbons: Sources & Knocking',
+  '2. Alkanes: Preparation & Identification',
+  '3. Alkanes: Physical Properties & Halogenation',
+  '4. Alkanes: Combustion, Pyrolysis & Reforming',
+  '5. Alkenes: Laboratory & Industrial Preparation',
+  '6. Electrophilic Addition & Markovnikov Rule',
+  '7. Alkenes: Addition Reactions & Ozonolysis',
+  '8. Alkenes: Baeyer Test, Polymerization & Tests',
+  '9. Alkynes: Preparation from CaC2 & Dihaloalkanes',
+  '10. Acidic Character of 1-Alkynes & Precipitate Tests',
+  '11. Alkynes: Hydrogenation, Halogenation & Hydration',
+  '12. Alkynes: Cyclic Polymerization & Ozonolysis',
 ];
+
+export const ENGLISH_MAIN_TOPICS: { id: string; title: string }[] =
+  MAIN_NAVIGATION_TOPICS.map((topic, index) => ({
+    id: topic.id,
+    title: ENGLISH_TOPIC_TITLES[index] || topic.title,
+  }));
 
 export const BUILT_IN_PAGES: LibraryTopicPage[] = [
   {
@@ -1481,7 +1487,7 @@ export function doesContentRequireApproval(role: UserRole): boolean {
 // APP VERSION, VARIANT DETECTION, GITHUB RELEASE & NOTIFICATION SYSTEM
 // ============================================================================
 
-export const APP_CURRENT_VERSION = '1.0.2';
+export const APP_CURRENT_VERSION = '1.0.3';
 export const GITHUB_REPO_OWNER = 'afeed16554';
 export const GITHUB_REPO_NAME = 'Web-books_16554';
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
@@ -1672,11 +1678,11 @@ export interface ReleaseUpdateSummary {
 export const FALLBACK_GITHUB_RELEASES: GitHubReleaseInfo[] = [
   {
     tagName: 'v1.0.2',
-    name: 'v1.0.2 — Unified App Drawer Icon & Dark Theme Refinement',
+    name: 'v1.0.2',
     htmlUrl: `${GITHUB_RELEASES_URL}/tag/v1.0.2`,
     prerelease: false,
     publishedAt: '2026-10-20T08:00:00Z',
-    body: 'Unified Android app drawer adaptive icon and Windows EXE icon with the in-app Web Books globe emblem, refined neutral dark theme palette, and updated version tracking.',
+    body: 'Official multi-platform release for Android APK, Windows Desktop EXE, and Web.',
     assets: [
       {
         name: 'app-debug.apk',

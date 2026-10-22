@@ -542,7 +542,7 @@ export function SettingsPage({
           >
             <div className="min-w-0">
               <div className="font-bold text-sm sm:text-base truncate text-[var(--text-main)]">
-                {user?.displayName || 'Fahmid Hossain Afeed'}
+                {user ? user.displayName || user.email || 'Profile' : 'Profile'}
               </div>
               <div className="text-xs text-[var(--text-muted)] truncate mt-0.5">
                 {user?.email
@@ -562,7 +562,9 @@ export function SettingsPage({
                 />
               ) : (
                 <span>
-                  {(user?.displayName || 'Afeed').slice(0, 1).toUpperCase()}
+                  {(user?.displayName || user?.email || 'Profile')
+                    .slice(0, 1)
+                    .toUpperCase()}
                 </span>
               )}
             </div>

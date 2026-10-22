@@ -4,7 +4,7 @@ import type { Plugin } from 'vite';
 
 export const ANDROID_IC_LAUNCHER_VALUES_BG_XML = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#080D1A</color>
+    <color name="ic_launcher_background">#F4ECE1</color>
 </resources>
 `;
 
@@ -23,8 +23,9 @@ export const ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML = `<?xml version="1.0" encoding
                 android:endX="108"
                 android:endY="108"
                 android:type="linear">
-                <item android:color="#FF0F172A" android:offset="0.0" />
-                <item android:color="#FF020617" android:offset="1.0" />
+                <item android:color="#FFFAF3E8" android:offset="0.0" />
+                <item android:color="#FFF0E4D4" android:offset="0.55" />
+                <item android:color="#FFDECAB4" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
@@ -38,73 +39,87 @@ export const ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML = `<?xml version="1.0" encoding
     android:height="108dp"
     android:viewportWidth="768"
     android:viewportHeight="768">
-    <!-- Notebook Card Body -->
+    <!-- Inner Frosted Glass Squircle Plate -->
     <path
-        android:fillColor="#FF121218"
-        android:strokeColor="#FF27272F"
-        android:strokeWidth="8"
-        android:pathData="M258,204 H510 A44,44 0 0 1 554,248 V520 A44,44 0 0 1 510,564 H258 A44,44 0 0 1 214,520 V248 A44,44 0 0 1 258,204 Z" />
-    <!-- Sky-Blue Top Header -->
-    <path
-        android:pathData="M214,248 C214,223.699 233.699,204 258,204 H510 C534.301,204 554,223.699 554,248 V286 H214 V248 Z">
+        android:strokeColor="#D9FFFFFF"
+        android:strokeWidth="5"
+        android:pathData="M240,164 H528 A76,76 0 0 1 604,240 V528 A76,76 0 0 1 528,604 H240 A76,76 0 0 1 164,528 V240 A76,76 0 0 1 240,164 Z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="214"
-                android:startY="204"
-                android:endX="554"
-                android:endY="286"
+                android:startX="164"
+                android:startY="164"
+                android:endX="604"
+                android:endY="604"
                 android:type="linear">
-                <item android:color="#FF38BDF8" android:offset="0.0" />
-                <item android:color="#FF0284C7" android:offset="1.0" />
+                <item android:color="#F2FCF8F2" android:offset="0.0" />
+                <item android:color="#E6F2E8DC" android:offset="0.5" />
+                <item android:color="#EBDFCBB8" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Header Camera/Status Dot & Bar -->
-    <path
-        android:fillColor="#FF020617"
-        android:pathData="M262,245 A12,12 0 1 0 286,245 A12,12 0 1 0 262,245 Z" />
-    <path
-        android:fillColor="#FF020617"
-        android:pathData="M312,237 H426 A8,8 0 0 1 434,245 A8,8 0 0 1 426,253 H312 A8,8 0 0 1 304,245 A8,8 0 0 1 312,237 Z" />
-    <!-- Reading Text Lines -->
-    <path
-        android:fillColor="#FFF8FAFC"
-        android:pathData="M266,334 H456 A10,10 0 0 1 466,344 A10,10 0 0 1 456,354 H266 A10,10 0 0 1 256,344 A10,10 0 0 1 266,334 Z" />
-    <path
-        android:fillColor="#FF94A3B8"
-        android:pathData="M263,374 H505 A7,7 0 0 1 512,381 A7,7 0 0 1 505,388 H263 A7,7 0 0 1 256,381 A7,7 0 0 1 263,374 Z" />
-    <path
-        android:fillColor="#FF94A3B8"
-        android:pathData="M263,406 H479 A7,7 0 0 1 486,413 A7,7 0 0 1 479,420 H263 A7,7 0 0 1 256,413 A7,7 0 0 1 263,406 Z" />
-    <!-- Web Globe Emblem -->
+    <!-- Signal Waves (Top-Right) -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#FF38BDF8"
-        android:strokeWidth="9"
-        android:pathData="M342,488 A42,42 0 1 0 426,488 A42,42 0 1 0 342,488 Z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FF38BDF8"
-        android:strokeWidth="7"
-        android:pathData="M364,488 A20,42 0 1 0 404,488 A20,42 0 1 0 364,488 Z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FF38BDF8"
-        android:strokeWidth="7"
+        android:strokeColor="#FFE8B856"
+        android:strokeWidth="21"
         android:strokeLineCap="round"
-        android:pathData="M342,488 L426,488" />
+        android:pathData="M456,270 A42,42 0 0 1 498,312" />
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#FF38BDF8"
-        android:strokeWidth="6"
+        android:strokeColor="#FFF07B4E"
+        android:strokeWidth="21"
         android:strokeLineCap="round"
-        android:pathData="M350,466 Q384,476 418,466" />
+        android:pathData="M456,232 A80,80 0 0 1 536,312" />
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#FF38BDF8"
-        android:strokeWidth="6"
+        android:strokeColor="#FFE8B856"
+        android:strokeWidth="21"
         android:strokeLineCap="round"
-        android:pathData="M350,510 Q384,500 418,510" />
+        android:pathData="M456,194 A118,118 0 0 1 574,312" />
+    <!-- Left Book: Coral-Orange Frosted Glass -->
+    <path
+        android:fillColor="#FFF25E22"
+        android:strokeColor="#B3FFD8BE"
+        android:strokeWidth="2"
+        android:pathData="M277,300 H313 A16,16 0 0 1 329,316 V502 A16,16 0 0 1 313,518 H277 A16,16 0 0 1 261,502 V316 A16,16 0 0 1 277,300 Z" />
+    <path
+        android:fillColor="#FFF34F29"
+        android:strokeColor="#CCFFE6D4"
+        android:strokeWidth="2.2"
+        android:pathData="M284,316 H306 A11,11 0 0 1 317,327 V491 A11,11 0 0 1 306,502 H284 A11,11 0 0 1 273,491 V327 A11,11 0 0 1 284,316 Z" />
+    <!-- Middle Book: Tall Espresso-Charcoal Frosted Glass -->
+    <path
+        android:fillColor="#FF483B35"
+        android:strokeColor="#80C6B6AC"
+        android:strokeWidth="2"
+        android:pathData="M356,266 H392 A16,16 0 0 1 408,282 V502 A16,16 0 0 1 392,518 H356 A16,16 0 0 1 340,502 V282 A16,16 0 0 1 356,266 Z" />
+    <path
+        android:fillColor="#FF403531"
+        android:strokeColor="#99E2D5CC"
+        android:strokeWidth="2.2"
+        android:pathData="M363,282 H385 A11,11 0 0 1 396,293 V491 A11,11 0 0 1 385,502 H363 A11,11 0 0 1 352,491 V293 A11,11 0 0 1 363,282 Z" />
+    <!-- Right Book: Tilted Golden-Amber Frosted Glass -->
+    <group
+        android:pivotX="466"
+        android:pivotY="410"
+        android:rotation="-18.5">
+        <path
+            android:fillColor="#FFDF9D3E"
+            android:strokeColor="#B3FFF2CE"
+            android:strokeWidth="2"
+            android:pathData="M448,304 H484 A16,16 0 0 1 500,320 V500 A16,16 0 0 1 484,516 H448 A16,16 0 0 1 432,500 V320 A16,16 0 0 1 448,304 Z" />
+        <path
+            android:fillColor="#FFD68A2C"
+            android:strokeColor="#CCFFF8E2"
+            android:strokeWidth="2.2"
+            android:pathData="M455,320 H477 A11,11 0 0 1 488,331 V489 A11,11 0 0 1 477,500 H455 A11,11 0 0 1 444,489 V331 A11,11 0 0 1 455,320 Z" />
+    </group>
+    <!-- Bookshelf Base Bar -->
+    <path
+        android:fillColor="#FF493A33"
+        android:strokeColor="#80BCA99C"
+        android:strokeWidth="1.8"
+        android:pathData="M243,526 H525 A13,13 0 0 1 538,539 A13,13 0 0 1 525,552 H243 A13,13 0 0 1 230,539 A13,13 0 0 1 243,526 Z" />
 </vector>
 `;
 
@@ -611,7 +626,7 @@ function applyWebBooksAndroidIcons(platformDirAbs) {
     const buildGradlePath = path.join(platformDirAbs, "app", "build.gradle");
     if (fs.existsSync(pkgJsonPath) && fs.existsSync(buildGradlePath)) {
       const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
-      const rawVersion = String(pkg.version || "1.0.2").replace(/^v/i, "");
+      const rawVersion = String(pkg.version || "1.0.3").replace(/^v/i, "");
       const nums = rawVersion.split("-")[0].split(".").map((n) => parseInt(n, 10) || 0);
       const versionCode = Math.max(1, (nums[0] || 1) * 10000 + (nums[1] || 0) * 100 + (nums[2] || 0));
       let gradleText = fs.readFileSync(buildGradlePath, "utf8");

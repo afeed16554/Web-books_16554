@@ -235,9 +235,11 @@ export function AppVersionSection({
           >
             <Sparkles className="w-4 h-4 shrink-0" />
             <span>
-              {releaseSummary.isTargetPrerelease
-                ? `Update to Beta (${targetRelease.tagName})`
-                : `Update Now (${targetRelease.tagName})`}
+              {releaseSummary.hasUpdate
+                ? releaseSummary.isTargetPrerelease
+                  ? `Update to Beta (${targetRelease.tagName})`
+                  : `Update Now (${targetRelease.tagName})`
+                : `View Latest Release (${targetRelease.tagName})`}
             </span>
             <ExternalLink className="w-3.5 h-3.5 shrink-0" />
           </a>

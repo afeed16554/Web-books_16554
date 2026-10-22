@@ -1,25 +1,104 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="wbBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#020617"/>
+    <linearGradient id="wbOuterBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FAF3E8"/>
+      <stop offset="55%" stop-color="#F0E4D4"/>
+      <stop offset="100%" stop-color="#DECAB4"/>
     </linearGradient>
-    <linearGradient id="wbAccent" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38bdf8"/>
-      <stop offset="100%" stop-color="#0284c7"/>
+    <linearGradient id="wbInnerPlate" x1="8%" y1="6%" x2="92%" y2="94%">
+      <stop offset="0%" stop-color="#FCF8F2" stop-opacity="0.96"/>
+      <stop offset="50%" stop-color="#F2E8DC" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#DFCBB8" stop-opacity="0.92"/>
     </linearGradient>
+    <linearGradient id="wbPlateRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#FFFDF9" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#C5AE96" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="wbBookOrangeOuter" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#FA9B60" stop-opacity="0.94"/>
+      <stop offset="45%" stop-color="#F25E22" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#E63312" stop-opacity="0.96"/>
+    </linearGradient>
+    <linearGradient id="wbBookOrangeInner" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#FF965B" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#F34F29" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#DC2B0C" stop-opacity="0.96"/>
+    </linearGradient>
+    <linearGradient id="wbBookDarkOuter" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#786459" stop-opacity="0.95"/>
+      <stop offset="48%" stop-color="#483B35" stop-opacity="0.94"/>
+      <stop offset="100%" stop-color="#261C18" stop-opacity="0.97"/>
+    </linearGradient>
+    <linearGradient id="wbBookDarkInner" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#8E7C70" stop-opacity="0.94"/>
+      <stop offset="48%" stop-color="#403531" stop-opacity="0.93"/>
+      <stop offset="100%" stop-color="#221814" stop-opacity="0.97"/>
+    </linearGradient>
+    <linearGradient id="wbBookGoldOuter" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#F3D492" stop-opacity="0.92"/>
+      <stop offset="50%" stop-color="#DF9D3E" stop-opacity="0.90"/>
+      <stop offset="100%" stop-color="#CE7922" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="wbBookGoldInner" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#F8E0AA" stop-opacity="0.94"/>
+      <stop offset="52%" stop-color="#D68A2C" stop-opacity="0.91"/>
+      <stop offset="100%" stop-color="#B96717" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="wbShelfGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#917B6E" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#58453B" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#362822" stop-opacity="0.98"/>
+    </linearGradient>
+    <linearGradient id="wbWaveGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8E6B5" stop-opacity="0.92"/>
+      <stop offset="55%" stop-color="#E8B856" stop-opacity="0.90"/>
+      <stop offset="100%" stop-color="#D9982F" stop-opacity="0.94"/>
+    </linearGradient>
+    <linearGradient id="wbWaveCoral" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7B799" stop-opacity="0.92"/>
+      <stop offset="55%" stop-color="#F07B4E" stop-opacity="0.91"/>
+      <stop offset="100%" stop-color="#E45328" stop-opacity="0.94"/>
+    </linearGradient>
+    <filter id="wbShadowSoft" x="-18%" y="-18%" width="140%" height="140%">
+      <feDropShadow dx="6" dy="10" stdDeviation="8" flood-color="#5A3E28" flood-opacity="0.28"/>
+    </filter>
+    <filter id="wbGrain" x="0%" y="0%" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="3" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix type="saturate" values="0" in="noise" result="monoNoise"/>
+      <feComponentTransfer in="monoNoise" result="alphaNoise">
+        <feFuncA type="linear" slope="0.13"/>
+      </feComponentTransfer>
+      <feBlend mode="overlay" in="alphaNoise" in2="SourceGraphic"/>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="116" fill="url(#wbBg)"/>
-  <rect x="86" y="76" width="340" height="360" rx="44" fill="#121218" stroke="#27272f" stroke-width="8"/>
-  <path d="M86 120 C86 95.699 105.699 76 130 76 H382 C406.301 76 426 95.699 426 120 V158 H86 V120 Z" fill="url(#wbAccent)"/>
-  <circle cx="146" cy="117" r="12" fill="#020617"/>
-  <rect x="176" y="109" width="130" height="16" rx="8" fill="#020617"/>
-  <rect x="128" y="206" width="210" height="20" rx="10" fill="#f8fafc"/>
-  <rect x="128" y="246" width="256" height="14" rx="7" fill="#94a3b8"/>
-  <rect x="128" y="278" width="230" height="14" rx="7" fill="#94a3b8"/>
-  <circle cx="256" cy="360" r="42" fill="none" stroke="#38bdf8" stroke-width="9"/>
-  <ellipse cx="256" cy="360" rx="20" ry="42" fill="none" stroke="#38bdf8" stroke-width="7"/>
-  <line x1="214" y1="360" x2="298" y2="360" stroke="#38bdf8" stroke-width="7" stroke-linecap="round"/>
-  <path d="M222 338 Q256 348 290 338" fill="none" stroke="#38bdf8" stroke-width="6" stroke-linecap="round"/>
-  <path d="M222 382 Q256 372 290 382" fill="none" stroke="#38bdf8" stroke-width="6" stroke-linecap="round"/>
+
+  <g filter="url(#wbGrain)">
+    <rect width="512" height="512" rx="116" fill="url(#wbOuterBg)"/>
+    <rect x="36" y="36" width="440" height="440" rx="96" fill="url(#wbInnerPlate)" stroke="url(#wbPlateRim)" stroke-width="4.5" filter="url(#wbShadowSoft)"/>
+    <g filter="url(#wbShadowSoft)" stroke-linecap="round" fill="none">
+      <path d="M 328 142 A 42 42 0 0 1 370 184" stroke="#FFF9EB" stroke-opacity="0.75" stroke-width="25"/>
+      <path d="M 328 142 A 42 42 0 0 1 370 184" stroke="url(#wbWaveGold)" stroke-width="21"/>
+      <path d="M 328 104 A 80 80 0 0 1 408 184" stroke="#FFF4EC" stroke-opacity="0.72" stroke-width="25"/>
+      <path d="M 328 104 A 80 80 0 0 1 408 184" stroke="url(#wbWaveCoral)" stroke-width="21"/>
+      <path d="M 328 66 A 118 118 0 0 1 446 184" stroke="#FFFBEF" stroke-opacity="0.78" stroke-width="25"/>
+      <path d="M 328 66 A 118 118 0 0 1 446 184" stroke="url(#wbWaveGold)" stroke-width="21"/>
+    </g>
+    <g filter="url(#wbShadowSoft)">
+      <rect x="133" y="172" width="68" height="218" rx="16" fill="url(#wbBookOrangeOuter)" stroke="#FFD8BE" stroke-opacity="0.62" stroke-width="2"/>
+      <rect x="145" y="188" width="44" height="186" rx="11" fill="url(#wbBookOrangeInner)" stroke="#FFE6D4" stroke-opacity="0.75" stroke-width="2.2"/>
+    </g>
+    <g filter="url(#wbShadowSoft)">
+      <rect x="212" y="138" width="68" height="252" rx="16" fill="url(#wbBookDarkOuter)" stroke="#C6B6AC" stroke-opacity="0.45" stroke-width="2"/>
+      <rect x="224" y="154" width="44" height="220" rx="11" fill="url(#wbBookDarkInner)" stroke="#E2D5CC" stroke-opacity="0.58" stroke-width="2.2"/>
+    </g>
+    <g transform="rotate(-18.5 338 282)" filter="url(#wbShadowSoft)">
+      <rect x="304" y="176" width="68" height="212" rx="16" fill="url(#wbBookGoldOuter)" stroke="#FFF2CE" stroke-opacity="0.68" stroke-width="2"/>
+      <rect x="316" y="192" width="44" height="180" rx="11" fill="url(#wbBookGoldInner)" stroke="#FFF8E2" stroke-opacity="0.8" stroke-width="2.2"/>
+    </g>
+    <g filter="url(#wbShadowSoft)">
+      <rect x="102" y="398" width="308" height="26" rx="13" fill="url(#wbShelfGrad)" stroke="#BCA99C" stroke-opacity="0.48" stroke-width="1.8"/>
+      <rect x="114" y="401" width="284" height="4" rx="2" fill="#FFF8F0" fill-opacity="0.22"/>
+    </g>
+  </g>
 </svg>

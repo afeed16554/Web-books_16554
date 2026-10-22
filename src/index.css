@@ -151,7 +151,6 @@
 }
 
 html {
-  scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -394,90 +393,166 @@ textarea {
 
 /* =====================================================================
    ULTRA-FLUID GPU-ACCELERATED SIDEBAR DRAWER & WORKSPACE TRANSITIONS
-   - Uses a fixed-width inner container (.wb-sidebar-inner = 18rem) with
-     CSS containment (contain: layout paint) so internal text, buttons, and
-     folder trees NEVER reflow or re-wrap during open/close animations!
-   - On Mobile (< 768px): Pure GPU compositor slide (translate3d + opacity).
-   - On Tablet & Desktop (>= 768px): Synchronized spring curve matching the
-     Viewing Area (cubic-bezier(0.22, 1, 0.36, 1)).
+   - Uses a fixed-width 18rem panel with strict layout/paint containment so
+     internal text, buttons, and folder trees NEVER reflow, re-wrap, or get
+     guillotine-clipped during open/close animations.
+   - Mobile (< 768px): Solid opaque sheet slide (translate3d) paired with a
+     smoothly fading scrim backdrop (.wb-sidebar-backdrop).
+   - Tablet & Desktop (>= 768px): Unified 18rem panel gliding via negative
+     left margin (margin-left: 0rem <-> -18rem) on a silky spring curve
+     (cubic-bezier(0.32, 0.72, 0, 1)) so the right border and content move
+     together as one physical drawer without clipping or ghostly mid-fade.
    ===================================================================== */
+.wb-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background-color: rgba(0, 0, 0, 0.56);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  will-change: opacity;
+  transition: opacity 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    visibility 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.wb-sidebar-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.wb-sidebar-backdrop.is-closed {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .wb-sidebar-backdrop {
+    display: none;
+  }
+}
+
 .wb-sidebar {
   position: fixed;
   top: 0;
   left: 0;
   height: 100dvh;
   width: 18rem;
-  z-index: 40;
+  min-width: 18rem;
+  max-width: 86vw;
+  z-index: 50;
   flex-shrink: 0;
-  background-color: var(--bg-card);
-  border-right: 1px solid var(--border);
   overflow: hidden;
-  contain: layout paint;
   backface-visibility: hidden;
-  will-change: transform, opacity;
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  transition:
+    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    visibility 0.32s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .wb-sidebar.is-open {
   transform: translate3d(0, 0, 0);
-  opacity: 1;
+  visibility: visible;
+  box-shadow: 14px 0 38px rgba(0, 0, 0, 0.42);
   pointer-events: auto;
 }
 
 .wb-sidebar.is-closed {
-  transform: translate3d(-102%, 0, 0);
-  opacity: 0;
+  transform: translate3d(-105%, 0, 0);
+  visibility: hidden;
+  box-shadow: none;
   pointer-events: none;
 }
 
 .wb-sidebar-inner {
   width: 18rem;
   min-width: 18rem;
+  max-width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-card);
+  border-right: 1px solid var(--border);
   contain: layout style;
   backface-visibility: hidden;
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  transition:
+    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.28s ease;
 }
 
 @media (min-width: 768px) {
   .wb-sidebar {
     position: sticky;
-    will-change: width, transform, opacity;
-    transition: width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-      border-color 0.2s ease;
+    top: 0;
+    left: auto;
+    max-width: none;
+    z-index: 20;
+    transform: none;
+    box-shadow: none;
+    will-change: width, min-width;
+    transition:
+      width 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+      min-width 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0.32s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .wb-sidebar.is-open {
     width: 18rem;
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
+    min-width: 18rem;
+    transform: none;
+    visibility: visible;
+    box-shadow: none;
+    pointer-events: auto;
   }
 
   .wb-sidebar.is-closed {
     width: 0rem;
-    border-right-width: 0px;
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
+    min-width: 0rem;
+    transform: none;
+    visibility: hidden;
+    box-shadow: none;
+    pointer-events: none;
   }
 
   .wb-sidebar.is-open .wb-sidebar-inner {
     transform: translate3d(0, 0, 0);
-    opacity: 1;
   }
 
   .wb-sidebar.is-closed .wb-sidebar-inner {
-    transform: translate3d(-24px, 0, 0);
-    opacity: 0;
+    transform: translate3d(-100%, 0, 0);
+    border-right-color: transparent;
   }
+}
+
+/* Smooth GPU-friendly Accordion for Sidebar Folder Tree Expand/Collapse */
+.wb-folder-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.26s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.wb-folder-collapse.is-expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.wb-folder-collapse-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 
 .smooth-workspace {
   min-width: 0;
   flex: 1 1 0%;
+  contain: layout style;
 }
 
 .view-transition-enter {
@@ -512,13 +587,19 @@ textarea {
   -electron-corner-smoothing: var(--curve-smoothing, 1);
   padding: clamp(1.35rem, 2.5vw, 2.35rem);
   margin-bottom: 1.5rem;
-  scroll-margin-top: 4.5rem;
+  scroll-margin-top: 4.75rem;
   box-shadow: var(--card-shadow);
-  content-visibility: auto;
-  contain-intrinsic-size: auto 460px;
-  contain: layout style;
-  transition: border-color 0.22s ease, background-color 0.22s ease, border-radius 0.22s ease;
+  transition:
+    border-color 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 0.22s ease,
+    border-radius 0.22s ease;
   transform: translateZ(0);
+}
+
+.topic-section.is-jump-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), var(--card-shadow);
 }
 
 /* Settings Group Card & Dotted Divider */

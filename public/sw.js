@@ -1,5 +1,5 @@
 // Service Worker for Web Books by Afeed
-const CACHE_NAME = 'web-books-cache-v1';
+const CACHE_NAME = 'web-books-cache-v1.0.3';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

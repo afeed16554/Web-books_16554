@@ -205,12 +205,21 @@ test('Selective Admin Email verification allows only primary admin or allowliste
   );
 });
 
-test('extractMainTopicsFromHtml parses section ids and h2 titles', () => {
+test('extractMainTopicsFromHtml parses section ids and h2 titles, and BUILT_IN_PAGES[0].mainTopics IDs all match actual DOM section IDs', () => {
   const sample = `<section class="topic-section" id="sec-a"><h2>1. Alkanes</h2></section>`;
   const topics = extractMainTopicsFromHtml(sample);
   assert.equal(topics.length, 1);
   assert.equal(topics[0].id, 'sec-a');
   assert.equal(topics[0].title, '1. Alkanes');
+
+  const builtInPage = BUILT_IN_PAGES[0];
+  assert.equal(builtInPage.mainTopics.length, 12);
+  for (const topic of builtInPage.mainTopics) {
+    assert.ok(
+      builtInPage.sectionsHtml.includes(`id="${topic.id}"`),
+      `Built-in page HTML must contain section with id="${topic.id}" for topic "${topic.title}"`
+    );
+  }
 });
 
 test('Collapsible Viewing Area collapses smoothly on scroll', () => {
@@ -541,30 +550,36 @@ test('Version System: Semantic version comparison, pre-release detection, and ap
   assert.equal(iosWeb.variant, 'ios-web');
   assert.equal(iosWeb.platformFamily, 'iOS');
 
-  // Semver & Pre-release parsing (both hyphenated and compact tags like v1.0.2pre)
-  const stableVer = parseSemver('v1.0.2');
+  // Semver & Pre-release parsing (both hyphenated and compact tags like v1.0.3pre)
+  const stableVer = parseSemver('v1.0.3');
   assert.equal(stableVer.isPrerelease, false);
-  assert.equal(stableVer.cleanTag, 'v1.0.2');
+  assert.equal(stableVer.cleanTag, 'v1.0.3');
 
-  const compactPreVer = parseSemver('v1.0.2pre');
+  const compactPreVer = parseSemver('v1.0.3pre');
   assert.equal(compactPreVer.isPrerelease, true);
   assert.equal(compactPreVer.prerelease, 'pre');
-  assert.equal(compactPreVer.cleanTag, 'v1.0.2pre');
-  assert.equal(compareSemver('v1.0.2', 'v1.0.2pre'), 1);
+  assert.equal(compactPreVer.cleanTag, 'v1.0.3pre');
+  assert.equal(compareSemver('v1.0.3', 'v1.0.3pre'), 1);
 
   const betaVer = parseSemver('v1.1.0-beta.1');
   assert.equal(betaVer.isPrerelease, true);
   assert.equal(betaVer.prerelease, 'beta.1');
 
-  assert.equal(compareSemver('v1.0.2', '1.0.1'), 1);
+  assert.equal(compareSemver('v1.0.3', '1.0.2'), 1);
   assert.equal(compareSemver('v1.1.0', 'v1.1.0-beta.1'), 1);
-  assert.equal(compareSemver('v1.1.0-beta.1', 'v1.0.2'), 1);
+  assert.equal(compareSemver('v1.1.0-beta.1', 'v1.0.3'), 1);
 
-  // Release evaluation against current installed version baseline
+  // Release evaluation against current installed version baseline (1.0.3) and real GitHub releases (v1.0.2, v1.0.2pre, v1.0.1, v1.0.0)
+  assert.equal(APP_CURRENT_VERSION, '1.0.3');
+  assert.deepEqual(
+    FALLBACK_GITHUB_RELEASES.map((r) => r.tagName),
+    ['v1.0.2', 'v1.0.2pre', 'v1.0.1', 'v1.0.0']
+  );
   const statusCurrent = evaluateReleaseUpdateStatus(APP_CURRENT_VERSION, FALLBACK_GITHUB_RELEASES, false);
   assert.equal(statusCurrent.hasUpdate, false);
   assert.equal(statusCurrent.hasStableUpdate, false);
   assert.equal(statusCurrent.targetRelease.tagName, 'v1.0.2');
+  assert.equal(statusCurrent.latestPrerelease?.tagName, 'v1.0.2pre');
   assert.equal(statusCurrent.repoUrl, GITHUB_REPO_URL);
 
   // Dynamic newer release evaluation (e.g. When fetched live from GitHub API)
@@ -588,7 +603,7 @@ test('Version System: Semantic version comparison, pre-release detection, and ap
   assert.equal(statusStable.isTargetPrerelease, false);
 
   // Pre-release Beta channel evaluation
-  const statusBeta = evaluateReleaseUpdateStatus('1.0.2', mockReleases, true);
+  const statusBeta = evaluateReleaseUpdateStatus('1.0.3', mockReleases, true);
   assert.equal(statusBeta.hasUpdate, true);
   assert.equal(statusBeta.isTargetPrerelease, true);
   assert.equal(statusBeta.targetRelease.tagName, 'v1.1.0-beta.1');
@@ -627,37 +642,48 @@ test('Notifications System: Version update notifications redirect to Settings Ve
   assert.ok(approvalNotif.approvalDetails.includes('Approved Moderator'));
 });
 
-test('Web Books Brand Logo: SVG contains Digital Notebook and Web Globe with valid data URIs', () => {
+test('Web Books Brand Logo: SVG contains Translucent Frosted Glass 3-Books, Bookshelf Base, Signal Waves, and Noisy Grain Texture with valid data URIs', () => {
   assert.ok(
     WEB_BOOKS_GLOBE_SVG_RAW.includes('viewBox="0 0 512 512"'),
-    'Globe SVG must have 512x512 viewBox'
+    'Framed SVG must have 512x512 viewBox'
   );
   assert.ok(
-    WEB_BOOKS_GLOBE_SVG_RAW.includes('rx="116"'),
-    'Framed icon must feature 116px squircle superellipse'
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('rx="116"') &&
+      WEB_BOOKS_GLOBE_SVG_RAW.includes('rx="96"'),
+    'Framed icon must feature outer (116px) and inner (96px) frosted squircle plates'
   );
   assert.ok(
-    WEB_BOOKS_GLOBE_SVG_RAW.includes('x="86" y="76" width="340" height="360"'),
-    'Must include notebook card base'
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('feTurbulence') &&
+      WEB_BOOKS_GLOBE_SVG_RAW.includes('fractalNoise'),
+    'Logo must include SVG fractalNoise turbulence filter for noisy grain texture'
   );
   assert.ok(
-    WEB_BOOKS_GLOBE_SVG_RAW.includes('cx="256" cy="360" r="42"'),
-    'Must feature web globe outer circle'
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('x="133" y="172" width="68" height="218"') &&
+      WEB_BOOKS_GLOBE_SVG_RAW.includes('x="212" y="138" width="68" height="252"') &&
+      WEB_BOOKS_GLOBE_SVG_RAW.includes('rotate(-18.5 338 282)'),
+    'Must include all three frosted books (left coral-orange, center tall dark, right tilted golden-amber)'
   );
   assert.ok(
-    WEB_BOOKS_GLOBE_SVG_RAW.includes('x1="214" y1="360" x2="298" y2="360"'),
-    'Must feature web globe equator line'
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('x="102" y="398" width="308" height="26"'),
+    'Must feature the horizontal bookshelf base bar'
+  );
+  assert.ok(
+    WEB_BOOKS_GLOBE_SVG_RAW.includes('M 328 142 A 42 42 0 0 1 370 184') &&
+      WEB_BOOKS_GLOBE_SVG_RAW.includes('M 328 104 A 80 80 0 0 1 408 184') &&
+      WEB_BOOKS_GLOBE_SVG_RAW.includes('M 328 66 A 118 118 0 0 1 446 184'),
+    'Must feature the three concentric signal waves radiating top-right'
   );
 
   // Transparent mark
   assert.ok(
-    WEB_BOOKS_MARK_SVG_RAW.includes('cx="256" cy="360" r="42"'),
-    'Mark SVG must feature web globe circle'
+    WEB_BOOKS_MARK_SVG_RAW.includes('rotate(-18.5 338 282)') &&
+      WEB_BOOKS_MARK_SVG_RAW.includes('feTurbulence'),
+    'Mark SVG must feature the frosted books, waves, and noisy grain filter'
   );
   assert.equal(
     WEB_BOOKS_MARK_SVG_RAW.includes('rx="116"'),
     false,
-    'Mark SVG must NOT have a dark container squircle rect'
+    'Mark SVG must NOT have an outer container squircle rect'
   );
 
   // Data URIs
@@ -695,7 +721,7 @@ test('User Manual & MIT License: Official License text is complete, valid, and a
   );
 });
 
-test('Android App Drawer Adaptive Icon matches the in-app Web Books Globe Logo', async () => {
+test('Android App Drawer Adaptive Icon matches the in-app Web Books Frosted Glass Logo', async () => {
   const {
     ANDROID_ADAPTIVE_ICON_XML,
     ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML,
@@ -708,14 +734,15 @@ test('Android App Drawer Adaptive Icon matches the in-app Web Books Globe Logo',
     'Adaptive icon must bind to Web Books vector background and foreground drawables'
   );
   assert.ok(
-    ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML.includes('#FF0F172A') &&
-      ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML.includes('#FF020617'),
-    'Adaptive icon background must use the dark navy gradient (#0f172a -> #020617)'
+    ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML.includes('#FFFAF3E8') &&
+      ANDROID_IC_LAUNCHER_DRAWABLE_BG_XML.includes('#FFDECAB4'),
+    'Adaptive icon background must use the warm porcelain-cream gradient (#FAF3E8 -> #DECAB4)'
   );
   assert.ok(
-    ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML.includes('#FF38BDF8') &&
-      ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML.includes('#FF121218'),
-    'Adaptive icon foreground must render the notebook card (#121218) and sky-blue header/globe (#38bdf8)'
+    ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML.includes('#FFF25E22') &&
+      ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML.includes('#FF483B35') &&
+      ANDROID_IC_LAUNCHER_DRAWABLE_FG_XML.includes('android:rotation="-18.5"'),
+    'Adaptive icon foreground must render the three frosted glass books, bookshelf base, and signal waves'
   );
 });
 
